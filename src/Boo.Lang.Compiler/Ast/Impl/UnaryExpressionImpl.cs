@@ -74,8 +74,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			UnaryExpression other = node as UnaryExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( UnaryExpression)node;
 			if (_operator != other._operator) return NoMatch("UnaryExpression._operator");
 			if (!Node.Matches(_operand, other._operand)) return NoMatch("UnaryExpression._operand");
 			return true;
@@ -99,13 +100,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			UnaryExpression clone = (UnaryExpression)FormatterServices.GetUninitializedObject(typeof(UnaryExpression));
+		
+			UnaryExpression clone = new UnaryExpression();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._expressionType = _expressionType;
 			clone._operator = _operator;
 			if (null != _operand)
@@ -114,6 +116,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._operand.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

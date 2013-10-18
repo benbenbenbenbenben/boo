@@ -29,13 +29,13 @@
 namespace Boo.Lang.Interpreter
 
 import System
-import System.Collections.Generic
 import System.Linq.Enumerable
 import Boo.Lang
 import Boo.Lang.Environments
 import Boo.Lang.Compiler
 import Boo.Lang.Compiler.Ast
 import Boo.Lang.Compiler.TypeSystem
+import Boo.Lang.Compiler.TypeSystem.Core
 import Boo.Lang.Compiler.TypeSystem.Reflection
 import Boo.Lang.Compiler.TypeSystem.Internal
 import Boo.Lang.Compiler.IO
@@ -134,35 +134,34 @@ class AbstractInterpreter:
 	References:
 		get: return _compiler.Parameters.References
 				
-	def SuggestCodeCompletion(code as string) as (IEntity):
+	[Obsolete("Use SuggestCompletionsFor which allows accessing the result in the right environment.")]
+	def SuggestCodeCompletion(code as string):
+		return SuggestCompletionsFor(code).Value
+	
+	[Obsolete("Use ResolveBoundEntity which allows accessing the result in the right environment.")]	
+	def ResolveEntity(code as string):
+		return ResolveBoundEntity(code).Value
+		
+	def SuggestCompletionsFor(code as string):
 	"""
 	The code must contain a __codecomplete__ member reference as a placeholder
 	to the suggestion.
 	
-	The return value is a an array of possible members or namespaces to be inserted
-	at the __codecomplete__.
+	The return value is a an environment bound array of candidate members
+	and/or namespaces to replace __codecomplete__.
 	"""
-		context as CompilerContext, entity as IEntity = ResolveEntity_(code)
-		
-		suggestions as (IEntity)
-		context.Environment.Run:
-			suggestions = FilterSuggestions(code, entity)
-		return suggestions
-		
-	def ResolveEntity(code as string) as IEntity:
-		_, suggestion = ResolveEntity_(code)
-		return suggestion
-		
-	private def ResolveEntity_(code as string):
+		return ResolveBoundEntity(code).Select[of (IEntity)]({ entity | FilterSuggestions(code, entity) })
+		            
+	def ResolveBoundEntity(code as string):
 		compiler = GetSuggestionCompiler()
 		try:
 			compiler.Parameters.Input.Add(StringInput("<code>", PreProcessImportLine(code)))
 			result = compiler.Run()
-			return result, result["suggestion"]			
+			return EnvironmentBoundValue.Create(result.Environment, result["suggestion"] as IEntity)			
 		ensure:
 			compiler.Parameters.Input.Clear()
 			
-	private def FilterSuggestions(code as string, entity as IEntity):
+	private def FilterSuggestions(code as string, entity as IEntity) as (IEntity):
 		ns = entity as INamespace
 		return array(IEntity, 0) if ns is null
 		return GetChildNamespaces(ns) if code.StartsWith("import ")
@@ -337,7 +336,7 @@ class AbstractInterpreter:
 			_declarations.Add(name, entity)
 			return entity
 	
-		override def Resolve(targetList as ICollection of IEntity, name as string, flags as EntityType) as bool:
+		override def Resolve(targetList as System.Collections.Generic.ICollection of IEntity, name as string, flags as EntityType) as bool:
 			return false unless flags == EntityType.Any
 	
 			entity as IEntity = _declarations[name]
@@ -401,7 +400,7 @@ class AbstractInterpreter:
 			return unless len(types)
 			
 			debug "caching", len(types), "callable types"
-			for type as InternalCallableType in types:
+			for type in types:
 				debug type
 				services.CachedCallableTypes.Add(GetGeneratedType(self.Context.GeneratedAssembly, type))
 				
@@ -423,6 +422,7 @@ class AbstractInterpreter:
 			
 		override def Dispose():
 			_namespace = null
+			super()
 
 	class ProcessVariableDeclarations(ProcessExpressionsWithInterpreterNamespace):
 	
@@ -433,7 +433,7 @@ class AbstractInterpreter:
 			
 		InEntryPoint:
 			get:
-				return _currentMethod.Method is _entryPoint
+				return CurrentMethod is _entryPoint
 	
 		override def Initialize(context as CompilerContext):
 			super(context)
@@ -520,16 +520,18 @@ class AbstractInterpreter:
 	
 		override def OnReferenceExpression(node as ReferenceExpression):
 			
-			if (InterpreterEntity.IsInterpreterEntity(GetOptionalEntity(node)) and
-					not AstUtil.IsLhsOfAssignment(node)):	
+			if ReferencesInterpreterEntity(node) and not node.IsTargetOfAssignment():	
 				ReplaceCurrentNode(CreateGetValue(node))
 	
 		override def LeaveBinaryExpression(node as BinaryExpression):
-			if InterpreterEntity.IsInterpreterEntity(GetOptionalEntity(node.Left)):
+			if ReferencesInterpreterEntity(node.Left):
 				ReplaceCurrentNode(CreateSetValue(node))
 				
+		def ReferencesInterpreterEntity(e as Expression):
+			return InterpreterEntity.IsInterpreterEntity(GetOptionalEntity(e))
+				
 		override def LeaveExpressionStatement(node as ExpressionStatement):
-			
+			return if node.IsSynthetic or node.Expression.IsSynthetic
 			return unless _interpreter.RememberLastValue and _isEntryPoint
 			
 			if node.Expression.ExpressionType is not TypeSystemServices.VoidType:

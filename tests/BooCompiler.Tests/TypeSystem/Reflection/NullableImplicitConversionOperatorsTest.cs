@@ -1,5 +1,3 @@
-using Boo.Lang.Compiler.TypeSystem;
-using Boo.Lang.Environments;
 using NUnit.Framework;
 
 namespace BooCompiler.Tests.TypeSystem.Reflection
@@ -12,10 +10,9 @@ namespace BooCompiler.Tests.TypeSystem.Reflection
 		{
 			RunInCompilerContextEnvironment(delegate
         	{
-        		var typeSystemServices = My<TypeSystemServices>.Instance;
-        		var nullableDouble = typeSystemServices.Map(typeof(double?));
-        		var doubleType = typeSystemServices.Map(typeof(double));
-        		var conversionOperator = typeSystemServices.FindExplicitConversionOperator(nullableDouble, doubleType);
+        		var nullableDouble = TypeSystemServices.Map(typeof(double?));
+        		var doubleType = TypeSystemServices.Map(typeof(double));
+        		var conversionOperator = TypeSystemServices.FindExplicitConversionOperator(nullableDouble, doubleType);
 				Assert.IsNotNull(conversionOperator);
         	});
 		}

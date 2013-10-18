@@ -91,21 +91,26 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 				WriteLine();
 			}
 
-			foreach (TypeMember member in m.Members)
+			foreach (var member in m.Members)
 			{
 				Visit(member);
 				WriteLine();
 			}
 
-			if (null != m.Globals)
-			{
+			if (m.Globals != null)
 				Visit(m.Globals.Statements);
-			}
+			
+			foreach (var attribute in m.Attributes)
+				WriteModuleAttribute(attribute);
 
-			foreach (Boo.Lang.Compiler.Ast.Attribute attribute in m.AssemblyAttributes)
-			{
+			foreach (var attribute in m.AssemblyAttributes)
 				WriteAssemblyAttribute(attribute);
-			}
+		}
+		
+		private void WriteModuleAttribute(Attribute attribute)
+		{
+			WriteAttribute(attribute, "module: ");
+			WriteLine();
 		}
 
 		private void WriteAssemblyAttribute(Attribute attribute)
@@ -138,6 +143,7 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 		{
 			WriteKeyword("import");
 			Write(" {0}", p.Namespace);
+			
 			if (null != p.AssemblyReference)
 			{
 				WriteKeyword(" from ");
@@ -148,6 +154,15 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 				else
 					WriteStringLiteral(assemblyRef);
 			}
+			
+			if (p.Expression.NodeType == NodeType.MethodInvocationExpression)
+			{
+				MethodInvocationExpression mie = (MethodInvocationExpression)p.Expression;
+				Write("(");
+				WriteCommaSeparatedList(mie.Arguments);
+				Write(")");
+			}
+			
 			if (null != p.Alias)
 			{
 				WriteKeyword(" as ");
@@ -482,11 +497,9 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 			WriteAttributes(p.Attributes, false);
 			
 			if (p.IsByRef)
-			{
 				WriteKeyword("ref ");
-			}
 			
-			if (p.ParentNode.NodeType == NodeType.CallableTypeReference)
+			if (IsCallableTypeReferenceParameter(p))
 			{
 				if (p.IsParamArray) Write("*");
 				Visit(p.Type);
@@ -496,6 +509,12 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 				Write(p.Name);
 				WriteTypeReference(p.Type);
 			}
+		}
+
+		private static bool IsCallableTypeReferenceParameter(ParameterDeclaration p)
+		{
+			var parentNode = p.ParentNode;
+			return parentNode != null && parentNode.NodeType == NodeType.CallableTypeReference;
 		}
 
 		override public void OnGenericParameterDeclaration(GenericParameterDeclaration gp)
@@ -904,7 +923,9 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 
 		public override void OnSpliceTypeDefinitionBody(SpliceTypeDefinitionBody node)
 		{
+			WriteIndented();
 			WriteSplicedExpression(node.Expression);
+			WriteLine();
 		}
 		
 		override public void OnSpliceTypeReference(SpliceTypeReference node)
@@ -1703,7 +1724,7 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 				WriteKeyword("internal ");
 			if (member.IsStatic)
 				WriteKeyword("static ");
-			else if (member.IsModifierSet(TypeMemberModifiers.Override))
+			else if (member.IsOverride)
 				WriteKeyword("override ");
 			else if (member.IsModifierSet(TypeMemberModifiers.Virtual))
 				WriteKeyword("virtual ");
@@ -1713,7 +1734,7 @@ namespace Boo.Lang.Compiler.Ast.Visitors
 				WriteKeyword("final ");
 			if (member.IsNew)
 				WriteKeyword("new ");
-			if (member.IsTransient)
+			if (member.HasTransientModifier)
 				WriteKeyword("transient ");
 		}
 

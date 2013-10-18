@@ -31,6 +31,12 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void automatic_stubs_for_interface_methods()
+		{
+			RunCompilerTestCase(@"automatic-stubs-for-interface-methods.boo");
+		}
+		
+		[Test]
 		public void baseclass_1()
 		{
 			RunCompilerTestCase(@"baseclass-1.boo");
@@ -136,6 +142,12 @@ namespace BooCompiler.Tests
 		public void constructors_1()
 		{
 			RunCompilerTestCase(@"constructors-1.boo");
+		}
+		
+		[Test]
+		public void enum_cast_to_single()
+		{
+			RunCompilerTestCase(@"enum-cast-to-single.boo");
 		}
 		
 		[Test]
@@ -445,6 +457,18 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void implicit_bool_with_shortcircuited_and_condition()
+		{
+			RunCompilerTestCase(@"implicit-bool-with-shortcircuited-and-condition.boo");
+		}
+		
+		[Test]
+		public void implicit_runtime_conversion()
+		{
+			RunCompilerTestCase(@"implicit-runtime-conversion.boo");
+		}
+		
+		[Test]
 		public void innerclasses_1()
 		{
 			RunCompilerTestCase(@"innerclasses-1.boo");
@@ -598,12 +622,6 @@ namespace BooCompiler.Tests
 		public void interfaces_17()
 		{
 			RunCompilerTestCase(@"interfaces-17.boo");
-		}
-		
-		[Test]
-		public void interfaces_18()
-		{
-			RunCompilerTestCase(@"interfaces-18.boo");
 		}
 		
 		[Test]
@@ -883,6 +901,24 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void partial_class_with_nested_types()
+		{
+			RunCompilerTestCase(@"partial-class-with-nested-types.boo");
+		}
+		
+		[Test]
+		public void partial_enums()
+		{
+			RunCompilerTestCase(@"partial-enums.boo");
+		}
+		
+		[Test]
+		public void partial_interfaces()
+		{
+			RunCompilerTestCase(@"partial-interfaces.boo");
+		}
+		
+		[Test]
 		public void properties_1()
 		{
 			RunCompilerTestCase(@"properties-1.boo");
@@ -1081,6 +1117,12 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void reserved_keywords_1()
+		{
+			RunCompilerTestCase(@"reserved-keywords-1.boo");
+		}
+		
+		[Test]
 		public void static_1()
 		{
 			RunCompilerTestCase(@"static-1.boo");
@@ -1090,6 +1132,18 @@ namespace BooCompiler.Tests
 		public void static_2()
 		{
 			RunCompilerTestCase(@"static-2.boo");
+		}
+		
+		[Test]
+		public void static_class_is_sealed_abstract_and_transient()
+		{
+			RunCompilerTestCase(@"static-class-is-sealed-abstract-and-transient.boo");
+		}
+		
+		[Test]
+		public void static_CompilerGlobalScope_class_is_sealed_and_abstract()
+		{
+			RunCompilerTestCase(@"static-CompilerGlobalScope-class-is-sealed-and-abstract.boo");
 		}
 		
 		[Test]

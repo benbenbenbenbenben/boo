@@ -103,6 +103,18 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void int_shift_overflow_checked()
+		{
+			RunCompilerTestCase(@"int-shift-overflow-checked.boo");
+		}
+		
+		[Test]
+		public void int_shift_overflow_unchecked()
+		{
+			RunCompilerTestCase(@"int-shift-overflow-unchecked.boo");
+		}
+		
+		[Test]
 		public void interpolation_1()
 		{
 			RunCompilerTestCase(@"interpolation-1.boo");
@@ -175,6 +187,12 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void string_yields_chars()
+		{
+			RunCompilerTestCase(@"string-yields-chars.boo");
+		}
+		
+		[Test]
 		public void typeof_1()
 		{
 			RunCompilerTestCase(@"typeof-1.boo");
@@ -202,6 +220,12 @@ namespace BooCompiler.Tests
 		public void uint_field_initializer()
 		{
 			RunCompilerTestCase(@"uint-field-initializer.boo");
+		}
+		
+		[Test]
+		public void ulong_bitshift()
+		{
+			RunCompilerTestCase(@"ulong-bitshift.boo");
 		}
 		
 		[Test]

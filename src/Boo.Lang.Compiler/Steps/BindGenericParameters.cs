@@ -26,6 +26,7 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
+using Boo.Lang.Compiler.TypeSystem.Internal;
 using Boo.Lang.Compiler.TypeSystem.Services;
 
 namespace Boo.Lang.Compiler.Steps
@@ -35,13 +36,8 @@ namespace Boo.Lang.Compiler.Steps
 	using Boo.Lang.Compiler.TypeSystem;
 
 	[Serializable]
-	public class BindGenericParameters : AbstractVisitorCompilerStep, ITypeMemberReifier
+	public class BindGenericParameters : AbstractFastVisitorCompilerStep, ITypeMemberReifier
 	{
-		override public void Run()
-		{
-			Visit(CompileUnit.Modules);
-		}
-
 		public override void OnGenericParameterDeclaration(GenericParameterDeclaration node)
 		{
 			if (node.Entity == null)

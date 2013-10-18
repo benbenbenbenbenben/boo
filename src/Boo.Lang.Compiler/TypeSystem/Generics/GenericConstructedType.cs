@@ -28,7 +28,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Boo.Lang.Compiler.TypeSystem.Core;
+using Boo.Lang.Compiler.TypeSystem.Internal;
 using Boo.Lang.Compiler.TypeSystem.Services;
 using Boo.Lang.Compiler.Util;
 using Boo.Lang.Environments;
@@ -45,7 +47,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 	/// </remarks>
 	public class GenericConstructedType : IType, IConstructedTypeInfo
 	{
-		protected IType _definition;
+		protected readonly IType _definition;
 		IType[] _arguments;
 		GenericMapping _genericMapping;
 		bool _fullyConstructed;
@@ -67,11 +69,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 
 		protected string BuildFullName()
 		{
-			string baseName = _definition.FullName;
-			int typeParametersPosition = baseName.LastIndexOf("[");
-			if (typeParametersPosition >= 0) baseName = baseName.Remove(typeParametersPosition);
-			string[] argumentNames = Array.ConvertAll<IType, string>(ConstructedInfo.GenericArguments, t => t.ToString());
-			return string.Format("{0}[of {1}]", baseName, string.Join(", ", argumentNames));
+			return _definition.FullName;
 		}
 
 		protected GenericMapping GenericMapping
@@ -192,14 +190,10 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 		public virtual bool IsAssignableFrom(IType other)
 		{
 			if (other == null)
-			{
 				return false;
-			}
 
-			if (other == this || other.IsSubclassOf(this) || (other == Null.Default && !IsValueType))
-			{
+			if (other == this || other.IsSubclassOf(this) || (other.IsNull() && !IsValueType))
 				return true;
-			}
 
 			return false;
 		}
@@ -239,7 +233,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 
 		public IEnumerable<IEntity> GetMembers()
 		{
-			return Collections.Select<IEntity, IEntity>(_definition.GetMembers(), GenericMapping.Map);
+			return _definition.GetMembers().Select<IEntity, IEntity>(GenericMapping.Map);
 		}
 
 		public string Name
@@ -257,7 +251,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 			get { return EntityType.Type; }
 		}
 
-		IType[] IConstructedTypeInfo.GenericArguments
+		IType[] IGenericArgumentsProvider.GenericArguments
 		{
 			get { return _arguments; }
 		}
@@ -334,6 +328,11 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 			}
 
 			return _signature;
+		}
+
+		public bool IsAnonymous
+		{
+			get { return false; }
 		}
 
 		override public bool IsAssignableFrom(IType other)

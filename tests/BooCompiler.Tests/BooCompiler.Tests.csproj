@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="3.5">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -14,8 +14,8 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
-    <OldToolsVersion>2.0</OldToolsVersion>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <OldToolsVersion>3.5</OldToolsVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <UpgradeBackupLocation>
     </UpgradeBackupLocation>
     <PublishUrl>publish\</PublishUrl>
@@ -33,6 +33,7 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -109,26 +110,30 @@
       <Package>mono-nunit</Package>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.Core, Version=3.5.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
-      <RequiredTargetFramework>3.5</RequiredTargetFramework>
-      <HintPath>..\..\..\..\Program Files\Reference Assemblies\Microsoft\Framework\v3.5\System.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractCompilerErrorsTestFixture.cs" />
     <Compile Include="AbstractCompilerTestCase.cs" />
     <Compile Include="ArraysIntegrationTestFixture.cs" />
+    <Compile Include="AssemblyEmitterTest.cs" />
+    <Compile Include="Ast\AncestorsTest.cs" />
     <Compile Include="Ast\AstAssert.cs" />
+    <Compile Include="Ast\CloningTest.cs" />
+    <Compile Include="Ast\EnumMemberTest.cs" />
+    <Compile Include="Ast\GenericParameterDeclarationTest.cs" />
+    <Compile Include="Ast\MethodXmlSerializationTest.cs" />
+    <Compile Include="Ast\NodeMatchingTest.cs" />
+    <Compile Include="Ast\ParameterDeclarationTest.cs" />
     <Compile Include="Ast\ReferenceExpressionTestFixture.cs" />
+    <Compile Include="Ast\TypeDefinitionTest.cs" />
     <Compile Include="AttributesIntegrationTestFixture.cs" />
     <Compile Include="AttributesTestFixture.cs" />
     <Compile Include="BooCompilerTest.cs" />
     <Compile Include="BooTestCaseUtil.cs" />
     <Compile Include="CallablesIntegrationTestFixture.cs" />
     <Compile Include="ClosuresIntegrationTestFixture.cs" />
-    <Compile Include="ClrextensionsIntegrationTestFixture.cs" />
+    <Compile Include="ClrExtensionsIntegrationTestFixture.cs" />
     <Compile Include="ClrIntegrationTestFixture.cs" />
     <Compile Include="CompilerContextTest.cs" />
     <Compile Include="CompilerErrorFactoryTest.cs" />
@@ -151,6 +156,7 @@
     <Compile Include="ModulesIntegrationTestFixture.cs" />
     <Compile Include="MyTest.cs" />
     <Compile Include="Net2ErrorsTestFixture.cs" />
+    <Compile Include="NotImplementedErrorsTestFixture.cs" />
     <Compile Include="OperatorsIntegrationTestFixture.cs" />
     <Compile Include="Pipeline\AllParametersRequiredAttribute.cs" />
     <Compile Include="Pipeline\ViewStateAttribute.cs" />
@@ -160,6 +166,8 @@
     <Compile Include="SmokeTest.cs" />
     <Compile Include="StatementsIntegrationTestFixture.cs" />
     <Compile Include="StdlibTestFixture.cs" />
+    <Compile Include="Steps\InjectImplicitBooleanConversionsTest.cs" />
+    <Compile Include="Steps\MacroProcessing\MacroExpanderTest.cs" />
     <Compile Include="SupportingClasses\AbstractClass.cs" />
     <Compile Include="SupportingClasses\BaseInterface.cs" />
     <Compile Include="SupportingClasses\BOO313BaseClass.cs" />
@@ -186,6 +194,7 @@
     <Compile Include="SupportingClasses\ReturnDucks.cs" />
     <Compile Include="SupportingClasses\SByteEnum.cs" />
     <Compile Include="SupportingClasses\TestEnum.cs" />
+    <Compile Include="SupportingClasses\ThisReturnTypeIsAttribute.cs" />
     <Compile Include="SupportingClasses\Transform.cs" />
     <Compile Include="SupportingClasses\ValueTypeOverrideBoolOperator.cs" />
     <Compile Include="SupportingClasses\VarArgs.cs" />
@@ -196,6 +205,7 @@
     <Compile Include="TypeSystem\Core\GlobalNamespaceTest.cs" />
     <Compile Include="TypeSystem\Core\NamespaceAssert.cs" />
     <Compile Include="TypeSystem\EntityFormatterTestBase.cs" />
+    <Compile Include="TypeSystem\Generics\GenericTypeTest.cs" />
     <Compile Include="TypeSystem\Internal\EntityFormatterTest.cs" />
     <Compile Include="TypeSystem\Internal\InternalCompileUnitTest.cs" />
     <Compile Include="TypeSystem\Reflection\BeanPropertyFinder.cs" />
@@ -203,13 +213,17 @@
     <Compile Include="TypeSystem\Reflection\NullableImplicitConversionOperatorsTest.cs" />
     <Compile Include="TypeSystem\Reflection\ReflectionTypeSystemProviderExtensionTest.cs" />
     <Compile Include="TypeSystem\Reflection\ReflectionTypeSystemProviderTest.cs" />
+    <Compile Include="TypeSystem\Services\BooCodeBuilderTest.cs" />
     <Compile Include="TypeSystem\Services\CodeReifierTest.cs" />
     <Compile Include="TypeSystem\Services\DowncastPermissionsTest.cs" />
+    <Compile Include="TypeSystem\Services\InvocationTypeInferenceRulesTest.cs" />
     <Compile Include="TypeSystem\Services\MemberCollectorTest.cs" />
     <Compile Include="TypeSystem\Services\NameResolutionServiceTest.cs" />
     <Compile Include="UnsafeErrorsTestFixture.cs" />
     <Compile Include="UnsafeTestFixture.cs" />
     <Compile Include="Util\ArrayEqualityComparerTest.cs" />
+    <Compile Include="Util\MethodsTest.cs" />
+    <Compile Include="Util\PropertiesTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">

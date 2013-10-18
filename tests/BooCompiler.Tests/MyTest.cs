@@ -11,10 +11,16 @@ namespace BooCompiler.Tests
 	public class MyTest
 	{  
 	    [Test]
-		[ExpectedException(typeof(InvalidOperationException))]
 		public void MyOutsideContext()
 		{
-			NameResolutionService service = My<NameResolutionService>.Instance;
+			try
+	    	{
+	    		NameResolutionService service = My<NameResolutionService>.Instance;
+				Assert.Fail();
+	    	}
+			catch (InvalidOperationException)
+	    	{	
+	    	}
 		}
 
 		[Test]
@@ -53,7 +59,9 @@ namespace BooCompiler.Tests
 
 		private void RunInCompilerContextEnvironment(Action action)
 		{
-			new CompilerContext(false).Environment.Run(action);
+			ActiveEnvironment.With(new CompilerContext(false).Environment, () => {
+				action();
+			});
 		}
 	}
 }

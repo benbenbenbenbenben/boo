@@ -39,18 +39,13 @@ namespace Boo.Lang.Compiler.Steps
 	public class ProcessInheritedAbstractMembers : AbstractVisitorCompilerStep, ITypeMemberReifier
 	{
 		private List<TypeDefinition> _newAbstractClasses;
-		private Hash _classDefinitionList;
 		private int _depth;
 		private Set<IEntity> _explicitMembers;
 
 		override public void Run()
 		{	
 			_newAbstractClasses = new List<TypeDefinition>();
-			_classDefinitionList = new Hash();
-
 			Visit(CompileUnit.Modules);
-
-			_classDefinitionList.Clear();
 			ProcessNewAbstractClasses();
 		}
 
@@ -133,38 +128,66 @@ namespace Boo.Lang.Compiler.Steps
 			return true;
 		}
 
-		public override bool EnterInterfaceDefinition(InterfaceDefinition node)
+		public override void OnInterfaceDefinition(InterfaceDefinition node)
 		{
-			return !WasVisited(node);
-		}
-
-		override public void LeaveInterfaceDefinition(InterfaceDefinition node)
-		{
+			if (WasVisited(node))
+				return;
 			MarkVisited(node);
+
+			base.OnInterfaceDefinition(node);
 		}
 
-		public override bool EnterClassDefinition(ClassDefinition node)
+		public override void OnClassDefinition(ClassDefinition node)
 		{
-			return !WasVisited(node);
-		}
-
-		override public void LeaveClassDefinition(ClassDefinition node)
-		{
+			if (WasVisited(node))
+				return;
 			MarkVisited(node);
-			
-			if (!_classDefinitionList.Contains(node.Name))
-				_classDefinitionList.Add(node.Name, node);
 
-			_explicitMembers = ExplicitlyImplementedMembersOn(node);
-			foreach (TypeReference baseTypeRef in node.BaseTypes)
-			{	
-				IType baseType = GetType(baseTypeRef);
-				EnsureRelatedNodeWasVisited(node, baseType);
-				
-				if (baseType.IsInterface)
-					ResolveInterfaceMembers(node, baseTypeRef, baseType);
-				else if (IsAbstract(baseType))
-					ResolveAbstractMembers(node, baseTypeRef, baseType);
+			base.OnClassDefinition(node);
+
+			ProcessBaseTypes(node, GetType(node), null);
+		}
+
+		/// <summary>
+		/// This method scans all inherited types (classes and interfaces) and checks if abstract members of base types
+		/// were implemented in current class definition. If abstract member is not implemented then stub is created.
+		/// Stubs are created in two cases:
+		/// 1) if any member of base interfaces is not implemented 
+		/// 2) if any member of base types is not implemented and current class definition is not abstract.
+		/// </summary>
+		/// <param name="originalNode"></param>
+		/// <param name="currentType"></param>
+		/// <param name="rootBaseType"></param>
+		private void ProcessBaseTypes(ClassDefinition originalNode, IType currentType, TypeReference rootBaseType)
+		{
+			//First method call iterates through BaseTypes of ClassDefinition.
+			//Following recursive calls work with IType. Using IType is necessary to process external types (no ClassDefinition).
+			if (rootBaseType == null)
+			{
+				//Executing method first time.
+				//Checking all interfaces and base type
+				_explicitMembers = null;
+				foreach (var baseTypeRef in originalNode.BaseTypes)
+				{
+					var baseType = GetType(baseTypeRef);
+					EnsureRelatedNodeWasVisited(originalNode, baseType);
+
+					if (baseType.IsInterface)
+					{
+						if (_explicitMembers == null) _explicitMembers = ExplicitlyImplementedMembersOn(originalNode);
+						ResolveInterfaceMembers(originalNode, baseType, baseTypeRef);
+					}
+					//Do not resolve abstract members if class is abstract
+					else if (!IsAbstract(GetType(originalNode)) && IsAbstract(baseType))
+						ResolveAbstractMembers(originalNode, baseType, baseTypeRef);
+				}
+			}
+			else
+			{
+				//This is recursive call. Checking base type only. 
+				//Don't need to check interfaces because they must be already implemented in the base type.
+				if (currentType.BaseType != null && IsAbstract(currentType.BaseType))
+					ResolveAbstractMembers(originalNode, currentType.BaseType, rootBaseType);
 			}
 		}
 
@@ -189,9 +212,9 @@ namespace Boo.Lang.Compiler.Steps
 		/// <summary>
 		/// This function checks for inheriting implementations from EXTERNAL classes only.
 		/// </summary>
-		bool CheckInheritsInterfaceImplementation(ClassDefinition node, IMember abstractMember)
+		bool CheckInheritsImplementation(ClassDefinition node, IMember abstractMember)
 		{
-			foreach (TypeReference baseTypeRef in node.BaseTypes)
+			foreach (var baseTypeRef in node.BaseTypes)
 			{
 				IType type = GetType(baseTypeRef);
 				if (type.IsInterface)
@@ -206,6 +229,8 @@ namespace Boo.Lang.Compiler.Steps
 
 		private IMember FindBaseMemberOf(IMember member, IType inType)
 		{
+			if (member.DeclaringType == inType) return null;
+
 			foreach (var candidate in ImplementationCandidatesFor(member, inType))
 			{
 				if (candidate == member)
@@ -264,7 +289,7 @@ namespace Boo.Lang.Compiler.Steps
 			//candidate.Name == "CopyTo"
 			//vs
 			//candidate.Name == "System.ICollection.CopyTo"
-			string[] temp = candidate.FullName.Split('.');
+			var temp = candidate.FullName.Split('.');
 			return temp[temp.Length - 1];
 		}
 
@@ -310,7 +335,7 @@ namespace Boo.Lang.Compiler.Steps
 			return false;
 		}
 
-		void ResolveAbstractProperty(ClassDefinition node, TypeReference baseTypeRef, IProperty baseProperty)
+		void ResolveAbstractProperty(ClassDefinition node, IProperty baseProperty, TypeReference rootBaseType)
 		{			
 			foreach (var p in GetAbstractPropertyImplementationCandidates(node, baseProperty))
 			{
@@ -323,21 +348,18 @@ namespace Boo.Lang.Compiler.Steps
 						return;
 			}
 
-			foreach(SimpleTypeReference parent in node.BaseTypes)
-			{
-				if(_classDefinitionList.Contains(parent.Name))
-				{
-					_depth++;
-					ResolveAbstractProperty(_classDefinitionList[parent.Name] as ClassDefinition, baseTypeRef, baseProperty);
-					_depth--;
-				}
-			}
-
-			if (CheckInheritsInterfaceImplementation(node, baseProperty))
+			if (CheckInheritsImplementation(node, baseProperty))
 				return;
 
-			if (_depth == 0)
-				AbstractMemberNotImplemented(node, baseTypeRef, baseProperty);
+			AbstractMemberNotImplemented(node, rootBaseType, baseProperty);
+		}
+
+		private ClassDefinition ClassDefinitionFor(TypeReference parent)
+		{
+			var internalClass = GetType(parent) as InternalClass;
+			return internalClass != null
+			       	? (ClassDefinition) internalClass.TypeDefinition
+			       	: null;
 		}
 
 		private bool ResolveAsImplementationOf(IProperty baseProperty, Property property)
@@ -353,7 +375,7 @@ namespace Boo.Lang.Compiler.Steps
 		private void AssertValidPropertyImplementation(Property p, IProperty baseProperty)
 		{
 			if (baseProperty.Type != p.Type.Entity)
-				Error(CompilerErrorFactory.ConflictWithInheritedMember(p, p.FullName, baseProperty.FullName));
+				Error(CompilerErrorFactory.ConflictWithInheritedMember(p, GetEntity(p), baseProperty));
 
 			AssertValidInterfaceImplementation(p, baseProperty);
 		}
@@ -389,40 +411,28 @@ namespace Boo.Lang.Compiler.Steps
 				return;
 			}
 
-			if (CheckInheritsInterfaceImplementation(node, baseEvent))
+			if (CheckInheritsImplementation(node, baseEvent))
 				return;
 
-			foreach (SimpleTypeReference parent in node.BaseTypes)
-			{
-				if (_classDefinitionList.Contains(parent.Name))
-				{
-					_depth++;
-					ResolveAbstractEvent(_classDefinitionList[parent.Name] as ClassDefinition, baseTypeRef, baseEvent);
-					_depth--;
-				}
-			}
-
-			if (_depth == 0)
-			{
 				TypeMember conflicting;
-				if (null == ev && null != (conflicting = node.Members[baseEvent.Name]))
+				if (null != (conflicting = node.Members[baseEvent.Name]))
 				{
 					//we've got a non-resolved conflicting member
-					Error(CompilerErrorFactory.ConflictWithInheritedMember(conflicting, conflicting.FullName, baseEvent.FullName));
+					Error(CompilerErrorFactory.ConflictWithInheritedMember(conflicting, (IMember)GetEntity(conflicting), baseEvent));
 					return;
 				}
 				AddStub(node, CodeBuilder.CreateAbstractEvent(baseTypeRef.LexicalInfo, baseEvent));
 				AbstractMemberNotImplemented(node, baseTypeRef, baseEvent);
-			}
+			
 		}
 
 		private void ProcessEventImplementation(Event ev, IEvent baseEvent)
 		{
 			MakeVirtualFinal(ev.Add);
 			MakeVirtualFinal(ev.Remove);
-			MakeVirtualFinal(ev.Remove);
+			MakeVirtualFinal(ev.Raise);
 			AssertValidInterfaceImplementation(ev, baseEvent);
-			_context.TraceInfo("{0}: Event {1} implements {2}", ev.LexicalInfo, ev, baseEvent);
+			Context.TraceInfo("{0}: Event {1} implements {2}", ev.LexicalInfo, ev, baseEvent);
 		}
 
 		private static void MakeVirtualFinal(Method method)
@@ -431,37 +441,24 @@ namespace Boo.Lang.Compiler.Steps
 			method.Modifiers |= TypeMemberModifiers.Final | TypeMemberModifiers.Virtual;
 		}
 
-		void ResolveAbstractMethod(ClassDefinition node, TypeReference baseTypeRef, IMethod baseMethod)
+		void ResolveAbstractMethod(ClassDefinition node, IMethod baseAbstractMethod, TypeReference rootBaseType)
 		{
-			if (baseMethod.IsSpecialName)
+			if (baseAbstractMethod.IsSpecialName)
 				return;
 			
-			foreach (Method method in GetAbstractMethodImplementationCandidates(node, baseMethod))
-				if (ResolveAsImplementationOf(baseMethod, method))
+			foreach (Method method in GetAbstractMethodImplementationCandidates(node, baseAbstractMethod))
+				if (ResolveAsImplementationOf(baseAbstractMethod, method))
 					return;
 
-			// FIXME: this will fail with InvalidCastException on a base type that's a GenericTypeReference!
-			foreach(SimpleTypeReference parent in node.BaseTypes)
-			{
-				if(_classDefinitionList.Contains(parent.Name))
-				{
-					_depth++;
-					ResolveAbstractMethod(_classDefinitionList[parent.Name] as ClassDefinition, baseTypeRef, baseMethod);
-					_depth--;
-				}
-			}
-
-			if (CheckInheritsInterfaceImplementation(node, baseMethod))
+			if (CheckInheritsImplementation(node, baseAbstractMethod))
 				return;
 
-			if (_depth == 0)
-			{			
-				if (!AbstractMemberNotImplemented(node, baseTypeRef, baseMethod))
-				{
-					//BEHAVIOR < 0.7.7: no stub, mark class as abstract
-					AddStub(node, CodeBuilder.CreateAbstractMethod(baseTypeRef.LexicalInfo, baseMethod));
-				}
+			if (!AbstractMemberNotImplemented(node, rootBaseType, baseAbstractMethod))
+			{
+				//BEHAVIOR < 0.7.7: no stub, mark class as abstract
+				AddStub(node, CodeBuilder.CreateAbstractMethod(rootBaseType.LexicalInfo, baseAbstractMethod));
 			}
+			
 		}
 
 		private bool ResolveAsImplementationOf(IMethod baseMethod, Method method)
@@ -486,17 +483,17 @@ namespace Boo.Lang.Compiler.Steps
 			if (IsUnknown(methodEntity.ReturnType))
 				method.ReturnType = CodeBuilder.CreateTypeReference(baseSignature.ReturnType);
 			else if (baseSignature.ReturnType != methodEntity.ReturnType)
-				Error(CompilerErrorFactory.ConflictWithInheritedMember(method, method.FullName, baseMethod.FullName));
+				Error(CompilerErrorFactory.ConflictWithInheritedMember(method, methodEntity, baseMethod));
 		}
 
 		private void TraceImplements(TypeMember member, IEntity baseMember)
 		{
-			_context.TraceInfo("{0}: Member {1} implements {2}", member.LexicalInfo, member, baseMember);
+			Context.TraceInfo("{0}: Member {1} implements {2}", member.LexicalInfo, member, baseMember);
 		}
 
 		private static bool IsUnknown(IType type)
 		{
-			return TypeSystem.TypeSystemServices.IsUnknown(type);
+			return TypeSystemServices.IsUnknown(type);
 		}
 
 		private IEnumerable<Method> GetAbstractMethodImplementationCandidates(TypeDefinition node, IMethod baseMethod)
@@ -561,7 +558,7 @@ namespace Boo.Lang.Compiler.Steps
 		{
 			if (IsValueType(node))
 			{
-				Error(CompilerErrorFactory.ValueTypeCantHaveAbstractMember(baseTypeRef, node.FullName, GetAbstractMemberSignature(member)));
+				Error(CompilerErrorFactory.ValueTypeCantHaveAbstractMember(baseTypeRef, GetType(node), member));
 				return false;
 			}
 			if (!node.IsAbstract)
@@ -573,15 +570,13 @@ namespace Boo.Lang.Compiler.Steps
 				CompilerWarning warning = null;
 				if (null != m)
 				{
-					warning = CompilerWarningFactory.AbstractMemberNotImplementedStubCreated(baseTypeRef,
-										node.FullName, GetAbstractMemberSignature(member));
+					warning = CompilerWarningFactory.AbstractMemberNotImplementedStubCreated(baseTypeRef, GetType(node), member);
 					if (m.NodeType != NodeType.Property || null == node.Members[m.Name])
 						AddStub(node, m);
 				}
 				else
 				{
-					warning = CompilerWarningFactory.AbstractMemberNotImplemented(baseTypeRef,
-										node.FullName, GetAbstractMemberSignature(member));
+					warning = CompilerWarningFactory.AbstractMemberNotImplemented(baseTypeRef, GetType(node), member);
 					_newAbstractClasses.AddUnique(node);
 				}
 				Warnings.Add(warning);
@@ -595,28 +590,20 @@ namespace Boo.Lang.Compiler.Steps
 			return ((IType)node.Entity).IsValueType;
 		}
 
-		private string GetAbstractMemberSignature(IMember member)
-		{
-			IMethod method = member as IMethod;
-			return method != null
-				? TypeSystemServices.GetSignature(method)
-				: member.FullName;
-		}
-
-		void ResolveInterfaceMembers(ClassDefinition node, TypeReference baseTypeRef, IType baseType)
+		void ResolveInterfaceMembers(ClassDefinition node, IType baseType, TypeReference rootBaseType)
 		{
 			foreach (IType entity in baseType.GetInterfaces())
-				ResolveInterfaceMembers(node, baseTypeRef, entity);
+				ResolveInterfaceMembers(node, entity, rootBaseType);
 			
 			foreach (IMember entity in baseType.GetMembers())
 			{
 				if (_explicitMembers.Contains(entity))
 					continue;
-				ResolveAbstractMember(node, baseTypeRef, entity);
+				ResolveAbstractMember(node, entity, rootBaseType);
 			}
 		}
 		
-		void ResolveAbstractMembers(ClassDefinition node, TypeReference baseTypeRef, IType baseType)
+		void ResolveAbstractMembers(ClassDefinition node, IType baseType, TypeReference rootBaseType)
 		{
 			foreach (IEntity member in baseType.GetMembers())
 			{
@@ -626,7 +613,7 @@ namespace Boo.Lang.Compiler.Steps
 					{
 						var method = (IMethod)member;
 						if (method.IsAbstract)
-							ResolveAbstractMethod(node, baseTypeRef, method);
+							ResolveAbstractMethod(node, method, rootBaseType);
 						break;
 					}
 					
@@ -634,7 +621,7 @@ namespace Boo.Lang.Compiler.Steps
 					{
 						var property = (IProperty)member;
 						if (IsAbstract(property))
-							ResolveAbstractProperty(node, baseTypeRef, property);
+							ResolveAbstractProperty(node, property, rootBaseType);
 						break;
 					}
 
@@ -642,12 +629,13 @@ namespace Boo.Lang.Compiler.Steps
 					{
 						var ev = (IEvent)member;
 						if (ev.IsAbstract)
-							ResolveAbstractEvent(node, baseTypeRef, ev);
+							ResolveAbstractEvent(node, rootBaseType, ev);
 						break;
 					}
-					
 				}
 			}
+
+			ProcessBaseTypes(node, baseType, rootBaseType);
 		}
 
 		private static bool IsAbstract(IProperty property)
@@ -661,31 +649,31 @@ namespace Boo.Lang.Compiler.Steps
 			return null != accessor && accessor.IsAbstract;
 		}
 
-		void ResolveAbstractMember(ClassDefinition node, TypeReference baseTypeRef, IMember member)
+		void ResolveAbstractMember(ClassDefinition node, IMember member, TypeReference rootBaseType)
 		{
 			switch (member.EntityType)
 			{
 				case EntityType.Method:
 				{
-					ResolveAbstractMethod(node, baseTypeRef, (IMethod)member);
+					ResolveAbstractMethod(node, (IMethod)member, rootBaseType);
 					break;
 				}
 				
 				case EntityType.Property:
 				{
-					ResolveAbstractProperty(node, baseTypeRef, (IProperty)member);
+					ResolveAbstractProperty(node, (IProperty)member, rootBaseType);
 					break;
 				}
 
 				case EntityType.Event:
 				{
-					ResolveAbstractEvent(node, baseTypeRef, (IEvent)member);
+					ResolveAbstractEvent(node, rootBaseType, (IEvent)member);
 					break;
 				}
 				
 				default:
 				{
-					NotImplemented(baseTypeRef, "abstract member: " + member);
+					NotImplemented(rootBaseType, "abstract member: " + member);
 					break;
 				}
 			}

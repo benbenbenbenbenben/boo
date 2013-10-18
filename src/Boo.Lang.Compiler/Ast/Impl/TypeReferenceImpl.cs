@@ -60,8 +60,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			TypeReference other = node as TypeReference;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( TypeReference)node;
 			if (_isPointer != other._isPointer) return NoMatch("TypeReference._isPointer");
 			return true;
 		}
@@ -79,15 +80,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			TypeReference clone = (TypeReference)FormatterServices.GetUninitializedObject(typeof(TypeReference));
-			clone._lexicalInfo = _lexicalInfo;
-			clone._endSourceLocation = _endSourceLocation;
-			clone._documentation = _documentation;
-			clone._entity = _entity;
-			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
-			clone._isPointer = _isPointer;
-			return clone;
+
+			throw new System.InvalidOperationException("Cannot clone abstract class: TypeReference");
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

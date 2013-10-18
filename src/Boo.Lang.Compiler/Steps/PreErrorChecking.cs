@@ -26,31 +26,18 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
+using Boo.Lang.Compiler.Ast;
+using Boo.Lang.Compiler.TypeSystem;
+using Boo.Lang.Compiler.TypeSystem.Internal;
+using Boo.Lang.Environments;
+
 namespace Boo.Lang.Compiler.Steps
 {	
-	using System.Text;
-	using Boo.Lang.Compiler;
-	using Boo.Lang.Compiler.Ast;
-	
 	public class PreErrorChecking : AbstractVisitorCompilerStep
-	{
-		static string[] InvalidMemberPrefixes = new string[] {
-														"___",
-														"get_",
-														"set_",
-														"add_",
-														"remove_",
-														"raise_" };
-		
-		override public void Run()
-		{
-			Visit(CompileUnit);
-		}
-		
+	{	
 		override public void LeaveField(Field node)
 		{
 			MakeStaticIfNeeded(node);
-			CheckMemberName(node);
 			CantBeMarkedAbstract(node);
 			CantBeMarkedPartial(node);
 		}
@@ -58,7 +45,6 @@ namespace Boo.Lang.Compiler.Steps
 		override public void LeaveProperty(Property node)
 		{
 			MakeStaticIfNeeded(node);
-			CheckMemberName(node);
 			CantBeMarkedTransient(node);
 			CantBeMarkedPartial(node);
 			CheckExplicitImpl(node);
@@ -78,7 +64,6 @@ namespace Boo.Lang.Compiler.Steps
 		override public void LeaveMethod(Method node)
 		{
 			MakeStaticIfNeeded(node);
-			CheckMemberName(node);
 			CantBeMarkedTransient(node);
 			CantBeMarkedPartial(node);
 			CheckExplicitImpl(node);
@@ -88,17 +73,15 @@ namespace Boo.Lang.Compiler.Steps
 		override public void LeaveEvent(Event node)
 		{
 			MakeStaticIfNeeded(node);
-			CheckMemberName(node);
 			CantBeMarkedPartial(node);
 			CheckModifierCombination(node);
 		}
 		
 		override public void LeaveInterfaceDefinition(InterfaceDefinition node)
 		{
-			CheckMemberName(node);
 			CantBeMarkedAbstract(node);
 			CantBeMarkedTransient(node);
-			CantBeMarkedPartial(node);
+			CantBeMarkedPartialIfNested(node);
 			CantBeMarkedFinal(node);
 			CantBeMarkedStatic(node);
 		}
@@ -106,7 +89,6 @@ namespace Boo.Lang.Compiler.Steps
 		override public void LeaveCallableDefinition(CallableDefinition node)
 		{
 			MakeStaticIfNeeded(node);
-			CheckMemberName(node);
 			CantBeMarkedAbstract(node);
 			CantBeMarkedTransient(node);
 			CantBeMarkedPartial(node);
@@ -114,7 +96,6 @@ namespace Boo.Lang.Compiler.Steps
 		
 		public override void LeaveStructDefinition(StructDefinition node)
 		{
-			CheckMemberName(node);
 			CantBeMarkedAbstract(node);
 			CantBeMarkedFinal(node);
 			CantBeMarkedStatic(node);
@@ -123,22 +104,19 @@ namespace Boo.Lang.Compiler.Steps
 
 		public override void LeaveEnumDefinition(EnumDefinition node)
 		{
-			CheckMemberName(node);
 			CantBeMarkedAbstract(node);
+			CantBeMarkedPartialIfNested(node);
 			CantBeMarkedFinal(node);
 			CantBeMarkedStatic(node);
-			CantBeMarkedPartial(node);
 		}
 
 		override public void LeaveClassDefinition(ClassDefinition node)
 		{
 			CheckModifierCombination(node);
-			CheckMemberName(node);
+			CantBeMarkedPartialIfNested(node);
 			
-			if(node.IsStatic)
-			{
+			if (node.IsStatic)
 				node.Modifiers |= TypeMemberModifiers.Abstract | TypeMemberModifiers.Final;
-			}
 		}
 		
 		override public void LeaveTryStatement(TryStatement node)
@@ -158,13 +136,13 @@ namespace Boo.Lang.Compiler.Steps
 				Warnings.Add(CompilerWarningFactory.EqualsInsteadOfAssign(node));
 			}
 		}
-		
-		bool IsTopLevelOfConditional(Node child)
+
+		static bool IsTopLevelOfConditional(Node child)
 		{
-			Node parent = child.ParentNode;
+			var parent = child.ParentNode;
 			return (parent.NodeType == NodeType.IfStatement
 				|| parent.NodeType == NodeType.UnlessStatement
-				|| parent.NodeType == NodeType.ConditionalExpression
+				|| (parent.NodeType == NodeType.ConditionalExpression && ((ConditionalExpression) parent).Condition == child)
 				|| parent.NodeType == NodeType.StatementModifier
 				|| parent.NodeType == NodeType.ReturnStatement
 				|| parent.NodeType == NodeType.YieldStatement);
@@ -187,9 +165,9 @@ namespace Boo.Lang.Compiler.Steps
 		
 		void ConstructorCannotBePolymorphic(Constructor node)
 		{
-			if(node.IsAbstract || node.IsOverride || node.IsVirtual)
+			if (node.IsAbstract || node.IsOverride || node.IsVirtual)
 			{
-				Error(CompilerErrorFactory.ConstructorCantBePolymorphic(node, node.FullName));
+				Error(CompilerErrorFactory.ConstructorCantBePolymorphic(node, EntityFor(node)));
 			}
 		}
 
@@ -219,22 +197,8 @@ namespace Boo.Lang.Compiler.Steps
 
 		void CantBeMarkedTransient(TypeMember member)
 		{
-			if (member.IsTransient)
-			{
+			if (member.HasTransientModifier)
 				Error(CompilerErrorFactory.CantBeMarkedTransient(member));
-			}
-		}
-		
-		void CheckMemberName(TypeMember node)
-		{
-			foreach (string prefix in InvalidMemberPrefixes)
-			{
-				if (node.Name.StartsWith(prefix))
-				{
-					Error(CompilerErrorFactory.ReservedPrefix(node, prefix));
-					break;
-				}
-			}
 		}
 		
 		void MakeStaticIfNeeded(TypeMember node)
@@ -287,25 +251,36 @@ namespace Boo.Lang.Compiler.Steps
 			Error(
 				CompilerErrorFactory.InvalidCombinationOfModifiers(
 					member,
-					member.FullName,
+					EntityFor(member),
 					string.Format("{0}, {1}", mod1.ToString().ToLower(), mod2.ToString().ToLower())));
 		}
-		
+
+		private IEntity EntityFor(TypeMember member)
+		{
+			return My<InternalTypeSystemProvider>.Instance.EntityFor(member);
+		}
+
+		private IMethod EntityFor(Constructor node)
+		{
+			return (IMethod)EntityFor((TypeMember)node);
+		}
+
+		void CantBeMarkedPartialIfNested(TypeDefinition type)
+		{
+			if (type.IsNested)
+				CantBeMarkedPartial(type);
+		}
 		
 		void CantBeMarkedPartial(TypeMember member)
 		{
 			if (member.IsPartial)
-			{
 				Error(CompilerErrorFactory.CantBeMarkedPartial(member));
-			}
 		}
 		
 		void CantBeMarkedStatic(TypeMember member)
 		{
 			if (member.IsStatic)
-			{
 				Error(CompilerErrorFactory.CantBeMarkedStatic(member));
-			}
 		}
 	}
 }

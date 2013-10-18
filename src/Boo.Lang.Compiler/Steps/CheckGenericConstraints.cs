@@ -32,13 +32,8 @@ using Boo.Lang.Compiler.Ast;
 namespace Boo.Lang.Compiler.Steps
 {
     [Serializable]
-    public class CheckGenericConstraints : AbstractVisitorCompilerStep
+    public class CheckGenericConstraints : AbstractFastVisitorCompilerStep
     {
-        public override void Run()
-        {
-            Visit(CompileUnit.Modules);
-        }
-
         public override void OnClassDefinition(ClassDefinition node)
         {
             CheckConstraints(node);

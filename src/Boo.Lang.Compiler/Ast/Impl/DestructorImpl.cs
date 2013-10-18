@@ -70,8 +70,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			Destructor other = node as Destructor;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( Destructor)node;
 			if (_modifiers != other._modifiers) return NoMatch("Destructor._modifiers");
 			if (_name != other._name) return NoMatch("Destructor._name");
 			if (!Node.AllMatch(_attributes, other._attributes)) return NoMatch("Destructor._attributes");
@@ -174,13 +175,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			Destructor clone = (Destructor)FormatterServices.GetUninitializedObject(typeof(Destructor));
+		
+			Destructor clone = new Destructor();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._modifiers = _modifiers;
 			clone._name = _name;
 			if (null != _attributes)
@@ -225,6 +227,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._explicitInfo.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

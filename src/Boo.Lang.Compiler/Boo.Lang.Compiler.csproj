@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="3.5">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -15,27 +15,7 @@
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
     <NoStdLib>False</NoStdLib>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <FileUpgradeFlags>
-    </FileUpgradeFlags>
-    <OldToolsVersion>2.0</OldToolsVersion>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <UpgradeBackupLocation>
-    </UpgradeBackupLocation>
-    <PublishUrl>publish\</PublishUrl>
-    <Install>true</Install>
-    <InstallFrom>Disk</InstallFrom>
-    <UpdateEnabled>false</UpdateEnabled>
-    <UpdateMode>Foreground</UpdateMode>
-    <UpdateInterval>7</UpdateInterval>
-    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
-    <UpdatePeriodically>false</UpdatePeriodically>
-    <UpdateRequired>false</UpdateRequired>
-    <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
-    <UseApplicationTrust>false</UseApplicationTrust>
-    <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -96,12 +76,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="System.Core, Version=3.5.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Core">
+      <SpecificVersion>False</SpecificVersion>
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
       <HintPath>..\..\..\..\Program Files\Reference Assemblies\Microsoft\Framework\v3.5\System.Core.dll</HintPath>
     </Reference>
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AbstractAstAttribute.cs" />
@@ -111,6 +91,7 @@
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="Ast\ArrayLiteralExpression.cs" />
     <Compile Include="Ast\ArrayTypeReference.cs" />
+    <Compile Include="Ast\AstNodePredicates.cs" />
     <Compile Include="Ast\AstUtil.cs" />
     <Compile Include="Ast\Attribute.cs" />
     <Compile Include="Ast\AttributeCollection.cs" />
@@ -197,6 +178,7 @@
     <Compile Include="Ast\Impl\DeclarationCollectionImpl.cs" />
     <Compile Include="Ast\Impl\DeclarationImpl.cs" />
     <Compile Include="Ast\Impl\DeclarationStatementImpl.cs" />
+    <Compile Include="Ast\Impl\DepthFirstGuide.cs" />
     <Compile Include="Ast\Impl\DepthFirstTransformer.cs" />
     <Compile Include="Ast\Impl\DepthFirstVisitor.cs" />
     <Compile Include="Ast\Impl\DestructorImpl.cs" />
@@ -214,6 +196,7 @@
     <Compile Include="Ast\Impl\ExpressionPairImpl.cs" />
     <Compile Include="Ast\Impl\ExpressionStatementImpl.cs" />
     <Compile Include="Ast\Impl\ExtendedGeneratorExpressionImpl.cs" />
+    <Compile Include="Ast\Impl\FastDepthFirstVisitor.cs" />
     <Compile Include="Ast\Impl\FieldImpl.cs" />
     <Compile Include="Ast\Impl\ForStatementImpl.cs" />
     <Compile Include="Ast\Impl\GeneratorExpressionCollectionImpl.cs" />
@@ -310,6 +293,7 @@
     <Compile Include="Ast\NamespaceDeclaration.cs" />
     <Compile Include="Ast\Node.cs" />
     <Compile Include="Ast\NodeCollection.cs" />
+    <Compile Include="Ast\NodeExtensions.cs" />
     <Compile Include="Ast\NodeType.Generated.cs" />
     <Compile Include="Ast\NullLiteralExpression.cs" />
     <Compile Include="Ast\OmittedExpression.cs" />
@@ -365,6 +349,7 @@
     <Compile Include="Ast\Visitors\TreePrinterVisitor.cs" />
     <Compile Include="Ast\WhileStatement.cs" />
     <Compile Include="Ast\YieldStatement.cs" />
+    <Compile Include="Attributes\ExtensionAttribute.cs" />
     <Compile Include="Attributes\StrictModeAttribute.cs" />
     <Compile Include="BooCompiler.cs" />
     <Compile Include="CancellableEventArgs.cs" />
@@ -408,15 +393,18 @@
     <Compile Include="Pipelines\ParseAndPrint.cs" />
     <Compile Include="Pipelines\ParseAndPrintAst.cs" />
     <Compile Include="Pipelines\ParseAndPrintXml.cs" />
+    <Compile Include="Pipelines\RemoveEmptyBlocks.cs" />
     <Compile Include="Pipelines\ResolveExpressions.cs" />
     <Compile Include="Pipelines\Run.cs" />
     <Compile Include="Resources\EmbeddedFileResource.cs" />
     <Compile Include="Resources\FileResource.cs" />
     <Compile Include="Resources\NamedEmbeddedFileResource.cs" />
     <Compile Include="Resources\NamedFileResource.cs" />
+    <Compile Include="Services\ExtensionTagger.cs" />
     <Compile Include="Services\LanguageAmbiance.cs" />
     <Compile Include="Services\UniqueNameProvider.cs" />
     <Compile Include="Steps\AbstractCompilerStep.cs" />
+    <Compile Include="Steps\AbstractFastVisitorCompilerStep.cs" />
     <Compile Include="Steps\AbstractNamespaceSensitiveCompilerStep.cs" />
     <Compile Include="Steps\AbstractNamespaceSensitiveVisitorCompilerStep.cs" />
     <Compile Include="Steps\AbstractTransformerCompilerStep.cs" />
@@ -430,6 +418,7 @@
     <Compile Include="Steps\BindTypeDefinitions.cs" />
     <Compile Include="Steps\BindTypeMembers.cs" />
     <Compile Include="Steps\BranchChecking.cs" />
+    <Compile Include="Steps\CacheRegularExpressionsInStaticFields.cs" />
     <Compile Include="Steps\CheckAttributesUsage.cs" />
     <Compile Include="Steps\CheckGenericConstraints.cs" />
     <Compile Include="Steps\CheckIdentifiers.cs" />
@@ -438,13 +427,16 @@
     <Compile Include="Steps\CheckMembersProtectionLevel.cs" />
     <Compile Include="Steps\CheckMemberTypes.cs" />
     <Compile Include="Steps\CheckNeverUsedMembers.cs" />
+    <Compile Include="Steps\CheckSlicingExpressions.cs" />
     <Compile Include="Steps\ClosureSignatureInferrer.cs" />
     <Compile Include="Steps\ConstantFolding.cs" />
     <Compile Include="Steps\ContextAnnotations.cs" />
+    <Compile Include="Steps\DetectNotImplementedFeatureUsage.cs" />
     <Compile Include="Steps\DumpReferences.cs" />
     <Compile Include="Steps\EmitAssembly.cs" />
     <Compile Include="Steps\EntityPredicates.cs" />
     <Compile Include="Steps\ExpandAstLiterals.cs" />
+    <Compile Include="Steps\ExpandComplexSlicingExpressions.cs" />
     <Compile Include="Steps\ExpandDuckTypedExpressions.cs" />
     <Compile Include="Steps\ExpandPropertiesAndEvents.cs" />
     <Compile Include="Steps\ExpandVarArgsMethodInvocations.cs" />
@@ -461,6 +453,7 @@
     <Compile Include="Steps\InitializeNameResolutionService.cs" />
     <Compile Include="Steps\InjectCallableConversions.cs" />
     <Compile Include="Steps\InjectCastsAndConversions.cs" />
+    <Compile Include="Steps\InjectImplicitBooleanConversions.cs" />
     <Compile Include="Steps\IntroduceGlobalNamespaces.cs" />
     <Compile Include="Steps\IntroduceModuleClasses.cs" />
     <Compile Include="Steps\MacroAndAttributeExpansion.cs" />
@@ -469,7 +462,8 @@
     <Compile Include="Steps\MacroProcessing\MacroExpander.cs" />
     <Compile Include="Steps\MacroProcessing\NodeGeneratorExpander.cs" />
     <Compile Include="Steps\MacroProcessing\TypeMemberStatementBubbler.cs" />
-    <Compile Include="Steps\MergePartialClasses.cs" />
+    <Compile Include="Steps\MergePartialTypes.cs" />
+    <Compile Include="Steps\MethodTrackingVisitorCompilerStep.cs" />
     <Compile Include="Steps\NormalizeExpressions.cs" />
     <Compile Include="Steps\NormalizeIterationStatements.cs" />
     <Compile Include="Steps\NormalizeStatementModifiers.cs" />
@@ -506,8 +500,16 @@
     <Compile Include="TypeSystem\Builders\BooClassBuilder.cs" />
     <Compile Include="TypeSystem\Builders\BooMethodBuilder.cs" />
     <Compile Include="TypeSystem\Builders\CallableTypeBuilder.cs" />
+    <Compile Include="TypeSystem\Builders\ICodeBuilder.cs" />
+    <Compile Include="TypeSystem\Builders\ITypeReferenceFactory.cs" />
+    <Compile Include="TypeSystem\Builders\MappedTypeReferenceFactory.cs" />
+    <Compile Include="TypeSystem\Builders\StandardTypeReferenceFactory.cs" />
+    <Compile Include="TypeSystem\BuiltinFunction.cs" />
+    <Compile Include="TypeSystem\BuiltinFunctionType.cs" />
     <Compile Include="TypeSystem\CallableSignature.cs" />
     <Compile Include="TypeSystem\Core\AbstractType.cs" />
+    <Compile Include="TypeSystem\Core\AliasedNamespace.cs" />
+    <Compile Include="TypeSystem\Core\AnonymousCallableType.cs" />
     <Compile Include="TypeSystem\Core\ArrayType.cs" />
     <Compile Include="TypeSystem\Core\ArrayTypeCache.cs" />
     <Compile Include="TypeSystem\Core\EmptyArrayType.cs" />
@@ -518,6 +520,7 @@
     <Compile Include="TypeSystem\Core\Namespaces.cs" />
     <Compile Include="TypeSystem\Core\ResolvedNamespaces.cs" />
     <Compile Include="TypeSystem\Core\SimpleNamespace.cs" />
+    <Compile Include="TypeSystem\EntityExtensions.cs" />
     <Compile Include="TypeSystem\EntityType.cs" />
     <Compile Include="TypeSystem\Error.cs" />
     <Compile Include="TypeSystem\Generics\AbstractGenericParameter.cs" />
@@ -560,11 +563,6 @@
     <Compile Include="TypeSystem\INameSpace.cs" />
     <Compile Include="TypeSystem\Internal\AbstractInternalType.cs" />
     <Compile Include="TypeSystem\Internal\AbstractLocalEntity.cs" />
-    <Compile Include="TypeSystem\Internal\AliasedNamespace.cs" />
-    <Compile Include="TypeSystem\Internal\AnonymousCallablesManager.cs" />
-    <Compile Include="TypeSystem\Internal\AnonymousCallableType.cs" />
-    <Compile Include="TypeSystem\Internal\BuiltinFunction.cs" />
-    <Compile Include="TypeSystem\Internal\BuiltinFunctionType.cs" />
     <Compile Include="TypeSystem\Internal\CompileUnitNamespace.cs" />
     <Compile Include="TypeSystem\Internal\DeclarationsNamespace.cs" />
     <Compile Include="TypeSystem\Internal\ImportAnnotations.cs" />
@@ -621,6 +619,7 @@
     <Compile Include="TypeSystem\Reflection\ReflectionNamespaceBuilder.cs" />
     <Compile Include="TypeSystem\Reflection\ReflectionTypeSystemProvider.cs" />
     <Compile Include="TypeSystem\Services\AccessibilityChecker.cs" />
+    <Compile Include="TypeSystem\Services\AnonymousCallablesManager.cs" />
     <Compile Include="TypeSystem\Services\BooCodeBuilder.cs" />
     <Compile Include="TypeSystem\Services\CallableResolutionService.cs" />
     <Compile Include="TypeSystem\Services\CodeReifier.cs" />
@@ -628,25 +627,28 @@
     <Compile Include="TypeSystem\Services\CurrentScope.cs" />
     <Compile Include="TypeSystem\Services\DowncastPermissions.cs" />
     <Compile Include="TypeSystem\Services\EntityFormatter.cs" />
+    <Compile Include="TypeSystem\Services\InvocationTypeInferenceRules.cs" />
     <Compile Include="TypeSystem\Services\MemberCollector.cs" />
     <Compile Include="TypeSystem\Services\MetadataUtil.cs" />
     <Compile Include="TypeSystem\Services\NameResolutionService.cs" />
+    <Compile Include="TypeSystem\Services\RuntimeMethodCache.cs" />
+    <Compile Include="TypeSystem\Services\TypeChecker.cs" />
     <Compile Include="TypeSystem\Services\TypeCompatibilityRules.cs" />
     <Compile Include="TypeSystem\Services\TypeSystemServices.cs" />
     <Compile Include="TypeSystem\TypeCollector.cs" />
+    <Compile Include="TypeSystem\TypeExtensions.cs" />
     <Compile Include="TypeSystem\Types.cs" />
     <Compile Include="TypeSystem\TypeSystemExtensions.cs" />
     <Compile Include="TypeSystem\TypeVisitor.cs" />
     <Compile Include="TypeSystem\Unknown.cs" />
     <Compile Include="TypeSystem\Variance.cs" />
     <Compile Include="Util\ArrayEqualityComparer.cs" />
-    <Compile Include="Util\Collections.cs" />
-    <Compile Include="Util\ITask.cs" />
     <Compile Include="Util\MemoizedFunction.cs" />
+    <Compile Include="Util\Methods.cs" />
     <Compile Include="Util\Permissions.cs" />
+    <Compile Include="Util\Properties.cs" />
     <Compile Include="Util\Set.cs" />
     <Compile Include="Util\StringUtilities.cs" />
-    <Compile Include="Util\TaskList.cs" />
     <Compile Include="Util\TypeUtilities.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -674,6 +676,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Steps\MethodProcessing\" />
+    <Folder Include="TypeSystem\Extensions\" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

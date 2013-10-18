@@ -121,12 +121,17 @@ namespace Boo.Lang.Compiler.Ast
 			return new ReferenceExpression(p.LexicalInfo, p.Name);
 		}
 		
+		public static Expression Lift(Field f)
+		{
+			return new ReferenceExpression(f.LexicalInfo, f.Name);
+		}
+		
 		public static Expression Lift(TypeDefinition type)
 		{
 			return new ReferenceExpression(type.LexicalInfo, type.FullName);
 		}
 
-		public static Expression Lift(System.Type type)
+		public static Expression Lift(Type type)
 		{
 			if (type.IsGenericType)
 				return LiftGenericType(type);

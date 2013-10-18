@@ -141,16 +141,11 @@ namespace Boo.Lang.Compiler.Steps
 		}
 	}
 	
-	public class BranchChecking : AbstractVisitorCompilerStep
+	public class BranchChecking : AbstractFastVisitorCompilerStep
 	{
 		private InternalMethod _currentMethod;
 
 		private MethodBodyState _state = new MethodBodyState();
-
-		public override void Run()
-		{
-			Visit(CompileUnit);
-		}
 
 		override public void OnTryStatement(TryStatement node)
 		{
@@ -175,8 +170,10 @@ namespace Boo.Lang.Compiler.Steps
 			_state.LeaveExceptionHandler();
 		}
 
-		override public void LeaveRaiseStatement(RaiseStatement node)
+		override public void OnRaiseStatement(RaiseStatement node)
 		{
+			base.OnRaiseStatement(node);
+
 			if (node.Exception != null) return;
 			if (_state.InExceptionHandler) return;
 			Error(CompilerErrorFactory.ReRaiseOutsideExceptionHandler(node));
@@ -241,17 +238,13 @@ namespace Boo.Lang.Compiler.Steps
 		{
 			AstAnnotations.SetTryBlockDepth(node, _state.TryBlockDepth);
 
-			if (null == _state.ResolveLabel(node.Name))
-			{
-				_state.AddLabel(new InternalLabel(node));
+			if (_state.ResolveLabel(node.Name) != null)
+			{	
+				Error(CompilerErrorFactory.LabelAlreadyDefined(node, _currentMethod, node.Name));
+				return;
 			}
-			else
-			{
-				Error(
-					CompilerErrorFactory.LabelAlreadyDefined(node,
-											_currentMethod.FullName,
-											node.Name));
-			}
+
+			_state.AddLabel(new InternalLabel(node));
 		}
 
 		override public void OnYieldStatement(YieldStatement node)

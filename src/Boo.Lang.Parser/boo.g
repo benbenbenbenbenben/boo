@@ -32,6 +32,7 @@ options
 
 {
 using Boo.Lang.Compiler.Ast;
+using AstAttribute=Boo.Lang.Compiler.Ast.Attribute;
 using Boo.Lang.Parser.Util;
 using System.Globalization;
 
@@ -55,6 +56,8 @@ tokens
 	DLIST; // declaration list
 	ESEPARATOR; // expression separator (imaginary token)
 	EOL;
+  ASSEMBLY_ATTRIBUTE_BEGIN;
+  MODULE_ATTRIBUTE_BEGIN;
 	ABSTRACT="abstract";
 	AND="and";
 	AS="as";
@@ -176,6 +179,8 @@ tokens
 	}
 	
 	protected abstract void EmitIndexedPropertyDeprecationWarning(Property deprecated);
+	
+	protected abstract void EmitTransientKeywordDeprecationWarning(LexicalInfo location);
 }
 
 protected
@@ -200,11 +205,11 @@ parse_module[Module module]
 	(namespace_directive[module])?
 	(import_directive[module])*
 	(
-		(ID (expression)?)=>{IsValidMacroArgument(LA(2))}? module_macro[module] |
+		(macro_name (expression)?)=>{IsValidMacroArgument(LA(2))}? module_macro[module] |
 		type_member[module.Members]
 	)*	
 	globals[module]
-	(assembly_attribute[module] eos)*
+	((assembly_attribute[module] | module_attribute[module]) eos)*
 ;
 
 protected
@@ -220,7 +225,7 @@ protected docstring[Node node]:
 		doc:TRIPLE_QUOTED_STRING { node.Documentation = DocStringFormatter.Format(doc.getText()); }
 		(eos)?
 	)?
-	;
+;
 			
 protected
 eos : (options { greedy = true; }: (EOL|EOS))+;
@@ -230,24 +235,54 @@ import_directive[Module container]
 {
 	Import node = null;
 }: 
-	node=import_directive_
+	(
+		node=import_directive_ |
+		node=import_directive_from_
+	)
 	{
-		container.Imports.Add(node);
+		if (node != null) container.Imports.Add(node);
 	}
 	eos
 ;
 
 protected
+identifier_expression returns [ReferenceExpression result]
+{
+	result = null;
+	IToken id = null;
+}:
+	id=identifier
+	{ if (id != null) result = new ReferenceExpression(ToLexicalInfo(id), id.getText()); }
+;
+
+protected
+namespace_expression returns [Expression result]
+{
+	result = null;
+	ExpressionCollection names = null;
+}:
+	result=identifier_expression
+	(
+		LPAREN
+		{
+			var mie = new MethodInvocationExpression(result);
+			names = mie.Arguments;
+			result = mie;
+		}
+		expression_list[names]
+		RPAREN
+	)? 
+;
+
+protected
 import_directive_ returns [Import returnValue]
 {
-	IToken id;
+	Expression ns = null;
+	IToken id = null;
 	returnValue = null;
 }:
-	IMPORT id=identifier
-	{
-		returnValue = new Import(ToLexicalInfo(id));
-		returnValue.Namespace = id.getText();
-	}
+	imp:IMPORT ns=namespace_expression
+	{ if (ns != null) returnValue = new Import(ToLexicalInfo(imp), ns); }
 	(
 		FROM
 			(
@@ -256,8 +291,7 @@ import_directive_ returns [Import returnValue]
 					sqs:SINGLE_QUOTED_STRING { id=sqs; }
 			)
 		{
-			returnValue.AssemblyReference = new ReferenceExpression(ToLexicalInfo(id));
-			returnValue.AssemblyReference.Name = id.getText();
+			returnValue.AssemblyReference = new ReferenceExpression(ToLexicalInfo(id), id.getText());
 		}				
 	)?
 	(
@@ -267,6 +301,25 @@ import_directive_ returns [Import returnValue]
 			returnValue.Alias.Name = alias.getText();
 		}
 	)?
+;
+
+protected
+import_directive_from_ returns [Import returnValue]
+{
+	Expression ns = null;
+	ExpressionCollection names = null;
+	returnValue = null;
+}:
+	from:FROM ns=identifier_expression IMPORT
+	{ 
+		var mie = new MethodInvocationExpression(ns);
+		names = mie.Arguments;
+		returnValue = new Import(ToLexicalInfo(from), mie);
+	}
+	(
+		MULTIPLY { returnValue.Expression = ns; } |
+		expression_list[names]
+	)
 ;
 
 protected
@@ -332,23 +385,26 @@ protected
 enum_definition [TypeMemberCollection container]
 	{
 		EnumDefinition ed = null;
+		TypeMemberCollection members = null;
 	}:
 	ENUM id:ID { ed = new EnumDefinition(ToLexicalInfo(id)); }
 	begin_with_doc[ed]
-	{
-		ed.Name = id.getText();
-		ed.Modifiers = _modifiers;
-		AddAttributes(ed.Attributes);
-		container.Add(ed);
-	}
-	(
-		(enum_member[ed])+
-	)
+		{
+			ed.Name = id.getText();
+			ed.Modifiers = _modifiers;
+			AddAttributes(ed.Attributes);
+			container.Add(ed);
+			members = ed.Members;
+		}
+		(
+			(PASS eos)
+			| (enum_member[members] | splice_type_definition_body[members])+
+		)
 	end[ed]
 	;
 	
 protected
-enum_member [EnumDefinition container]
+enum_member [TypeMemberCollection container]
 	{	
 		EnumMember em = null;
 		Expression initializer = null;
@@ -360,7 +416,7 @@ enum_member [EnumDefinition container]
 		em.Name = id.getText();
 		em.Initializer = initializer;
 		AddAttributes(em.Attributes);
-		container.Members.Add(em);
+		container.Add(em);
 	}
 	eos
 	docstring[em]
@@ -369,16 +425,17 @@ enum_member [EnumDefinition container]
 protected
 attributes
 {
+  AstAttribute attr = null;
 }
 :
 	{ _attributes.Clear(); }
 	(
 		LBRACK 
 		(
-			attribute
+			attr=attribute { if (attr != null) _attributes.Add(attr); }
 			(
 				COMMA
-				attribute
+			  attr=attribute { if (attr != null) _attributes.Add(attr); }
 			)*
 		)?
 		RBRACK		
@@ -387,39 +444,43 @@ attributes
 ;
 			
 protected
-attribute
+attribute returns [AstAttribute attr]
 	{		
 		antlr.IToken id = null;
-		Boo.Lang.Compiler.Ast.Attribute attr = null;
+    attr = null;
 	}:	
-	id=identifier
+	(id=identifier | t:TRANSIENT { id=t; })
 	{
-		attr = new Boo.Lang.Compiler.Ast.Attribute(ToLexicalInfo(id), id.getText());
-		_attributes.Add(attr);
+		attr = new AstAttribute(ToLexicalInfo(id), id.getText());
 	} 
 	(
 		LPAREN
 		argument_list[attr]
 		RPAREN
 	)?
-	;
+;
+
+protected
+module_attribute[Module module]
+	{
+		AstAttribute attr = null;
+	}:
+	MODULE_ATTRIBUTE_BEGIN
+  attr=attribute
+	RBRACK
+	{ module.Attributes.Add(attr); }
+;
 	
 protected
 assembly_attribute[Module module]
 	{
-		antlr.IToken id = null;
-		Boo.Lang.Compiler.Ast.Attribute attr = null;
+		AstAttribute attr = null;
 	}:
 	ASSEMBLY_ATTRIBUTE_BEGIN
-	id=identifier { attr = new Boo.Lang.Compiler.Ast.Attribute(ToLexicalInfo(id), id.getText()); }
-	(
-		LPAREN
-		argument_list[attr]
-		RPAREN
-	)?
+  attr=attribute
 	RBRACK
 	{ module.AssemblyAttributes.Add(attr); }
-	;
+;
 			
 protected
 class_definition [TypeMemberCollection container]
@@ -813,7 +874,7 @@ field_or_property [TypeMemberCollection container]
 		)
 	)
 	|
-	(ID expression_list[null] (eos | begin_with_doc[null]))
+	(macro_name expression_list[null] (eos | begin_with_doc[null]))
 		=> tm=member_macro
 	|	
 	(
@@ -911,7 +972,7 @@ property_accessor[Property p]
 		m.Modifiers = _modifiers;
 		body = m.Body;
 	}
-	compound_stmt[body]
+	(eos | compound_stmt[body])
 	;
 	
 protected
@@ -949,7 +1010,10 @@ type_member_modifier
 	PRIVATE { _modifiers |= TypeMemberModifiers.Private; } |
 	INTERNAL { _modifiers |= TypeMemberModifiers.Internal; } |			
 	FINAL { _modifiers |= TypeMemberModifiers.Final; } |
-	TRANSIENT { _modifiers |= TypeMemberModifiers.Transient; } |
+	t:TRANSIENT {
+		_modifiers |= TypeMemberModifiers.Transient;
+		EmitTransientKeywordDeprecationWarning(ToLexicalInfo(t));
+	} |
 	OVERRIDE { _modifiers |= TypeMemberModifiers.Override; } |
 	ABSTRACT { _modifiers |= TypeMemberModifiers.Abstract; } |
 	VIRTUAL { _modifiers |= TypeMemberModifiers.Virtual; } |
@@ -1325,9 +1389,10 @@ protected
 closure_macro_stmt returns [MacroStatement returnValue]
 	{
 		returnValue = null;
+		antlr.IToken id = null;
 		MacroStatement macro = new MacroStatement();
 	}:
-	id:ID expression_list[macro.Arguments]
+	id=macro_name expression_list[macro.Arguments]
 	{
 		macro.Name = id.getText();
 		macro.LexicalInfo = ToLexicalInfo(id);		
@@ -1381,17 +1446,24 @@ macro_stmt returns [MacroStatement returnValue]
 		returnValue = null;
 		MacroStatement macro = new MacroStatement();
 		StatementModifier modifier = null;
+		antlr.IToken id = null;
 	}:
-	id:ID expression_list[macro.Arguments]
+	id=macro_name expression_list[macro.Arguments]
 	(
-		macro_compound_stmt[macro.Body] { macro.Annotate("compound"); } |
-		eos |
-		modifier=stmt_modifier eos { macro.Modifier = modifier; } |
 		(
 			begin_with_doc[macro] 
 				macro_block[macro.Body.Statements]
 			end[macro.Body] { macro.Annotate("compound" ); }
-		) 
+		) |
+		macro_compound_stmt[macro.Body] { macro.Annotate("compound"); } |
+		(
+			(
+				eos |
+				modifier=stmt_modifier eos { macro.Modifier = modifier; }
+			)
+			docstring[macro]
+		)
+		
 	)
 	{
 		macro.Name = id.getText();
@@ -1399,6 +1471,15 @@ macro_stmt returns [MacroStatement returnValue]
 		
 		returnValue = macro;
 	}
+;
+
+protected
+macro_name returns [antlr.IToken name]
+{
+	name = null;
+}:
+	id:ID { name = id; }
+	| then:THEN { name = then; }
 ;
 
 protected
@@ -1468,7 +1549,7 @@ stmt [StatementCollection container]
 		s=if_stmt |
 		s=unless_stmt |
 		s=try_stmt |
-		(ID (expression)?)=>{IsValidMacroArgument(LA(2))}? s=macro_stmt |
+		(macro_name (expression)?)=>{IsValidMacroArgument(LA(2))}? s=macro_stmt |
 		(slicing_expression (ASSIGN|(COLON|DO|DEF)))=> s=assignment_or_method_invocation_with_block_stmt |
 		s=return_stmt |
 		(declaration COMMA)=> s=unpack_stmt |
@@ -1484,7 +1565,7 @@ stmt [StatementCollection container]
 				s=expression_stmt				
 			)
 			(			
-				m=stmt_modifier { s.Modifier = m; }
+				m=stmt_modifier { if (s != null) s.Modifier = m; }
 			)?
 			eos
 		)
@@ -2206,7 +2287,7 @@ ast_literal_block[QuasiquoteExpression e]
 	(ast_literal_module_prediction)=>(ast_literal_module[e])
 	
 	| (attributes (type_member_modifier | (modifiers
-		(CLASS | STRUCT | INTERFACE | EVENT | DEF | CALLABLE
+		(CLASS | ENUM | STRUCT | INTERFACE | EVENT | DEF | CALLABLE
 		| ((ID | splice_expression) (AS type_reference)? begin_with_doc[null] (GET|SET))))))
 		
 		=>((type_definition_member[collection])+ {
@@ -2700,7 +2781,7 @@ reference_expression returns [ReferenceExpression e]
 	IToken t = null;
 }:
 	(
-		id:ID { t = id; } |
+		t=macro_name |
 		ch:CHAR { t = ch; }
 	)
 	{
@@ -3018,14 +3099,22 @@ string_literal returns [Expression e]
 	dqs:DOUBLE_QUOTED_STRING
 	{
 		e = new StringLiteralExpression(ToLexicalInfo(dqs), dqs.getText());
+		e.Annotate("quote", "\"");
 	} |
 	sqs:SINGLE_QUOTED_STRING
 	{
 		e = new StringLiteralExpression(ToLexicalInfo(sqs), sqs.getText());
+		e.Annotate("quote", "'");
 	} |
 	tqs:TRIPLE_QUOTED_STRING
 	{
 		e = new StringLiteralExpression(ToLexicalInfo(tqs), tqs.getText());
+		e.Annotate("quote", "\"\"\"");
+	} |
+	bqs:BACKTICK_QUOTED_STRING
+	{
+		e = new StringLiteralExpression(ToLexicalInfo(bqs), bqs.getText());
+		e.Annotate("quote", "`");
 	}
 	;
 	
@@ -3169,7 +3258,7 @@ timespan_literal returns [TimeSpanLiteralExpression tsle] { tsle = null; }:
 		tsle = new TimeSpanLiteralExpression(ToLexicalInfo(value), PrimitiveParser.ParseTimeSpan(value, val)); 
 	}
 	;
-
+	
 protected
 expression_list[ExpressionCollection ec]
 	{
@@ -3179,7 +3268,7 @@ expression_list[ExpressionCollection ec]
 		e=expression { ec.Add(e); }
 		(
 			COMMA
-			e=expression { ec.Add(e); }
+			e=expression { if (e != null) ec.Add(e); }
 		)*
 	)?
 	;
@@ -3199,40 +3288,38 @@ protected
 argument[INodeWithArguments node]
 	{		
 		Expression value = null;
+		ExpressionPair pair = null;
 	}:
-	(ID COLON)=>(
-		id:ID colon:COLON value=expression
-		{
-			node.NamedArguments.Add(
-				new ExpressionPair(
-					ToLexicalInfo(colon),
-					new ReferenceExpression(ToLexicalInfo(id), id.getText()),
-					value));
-		}
-	) |
-	(
+	(expression_pair)=>(
+		pair=expression_pair
+		{ if (pair != null) node.NamedArguments.Add(pair); }
+	) | (
 		value=expression
-		{ if (null != value) { node.Arguments.Add(value); } }
+		{ if (value != null) node.Arguments.Add(value); }
 	)
-	;
+;
 
 protected
 identifier returns [IToken value]
 	{
 		value = null; _sbuilder.Length = 0;
+		IToken id1 = null;
 		IToken id2 = null;
 	}:
-	id1:ID
+	id1=macro_name
 	{					
-		_sbuilder.Append(id1.getText());
+		if (id1 != null) _sbuilder.Append(id1.getText());
 		value = id1;
 	}
 	( options { greedy = true; } :
 		DOT
 		id2=member
-		{ _sbuilder.Append('.'); _sbuilder.Append(id2.getText()); }
+		{
+			_sbuilder.Append('.');
+			if (id2 != null) _sbuilder.Append(id2.getText());
+		}
 	)*
-	{ value.setText(_sbuilder.ToString()); }
+	{ if (value != null) value.setText(_sbuilder.ToString()); }
 	;
 {
 using Boo.Lang.Parser.Util;
@@ -3255,6 +3342,8 @@ options
 	TokenStreamRecorder _erecorder;
 	
 	antlr.TokenStreamSelector _selector;
+
+	bool _preserveComments;
 	
 	internal void Initialize(antlr.TokenStreamSelector selector, int tabSize, antlr.TokenCreator tokenCreator)
 	{
@@ -3284,6 +3373,12 @@ options
 		{
 			return _skipWhitespaceRegion > 0;
 		}
+	}
+
+	public bool PreserveComments
+	{
+		get { return _preserveComments; }
+		set { _preserveComments = value; }
 	}
 	
 	void ParseInterpolatedExpression(int tokenClose, int tokenOpen)
@@ -3392,14 +3487,15 @@ LPAREN : '(' { EnterSkipWhitespaceRegion(); };
 	
 RPAREN : ')' { LeaveSkipWhitespaceRegion(); };
 
-protected
-ASSEMBLY_ATTRIBUTE_BEGIN: "assembly:";
-
 LBRACK : '[' { EnterSkipWhitespaceRegion(); }
 	(
-		("assembly:")=> "assembly:" { $setType(ASSEMBLY_ATTRIBUTE_BEGIN); } |
+		("module:" | "assembly:")=>
+    (
+      "module:" { $setType(MODULE_ATTRIBUTE_BEGIN); } |
+		  "assembly:" { $setType(ASSEMBLY_ATTRIBUTE_BEGIN); }
+    ) |
 	)
-	;
+;
 
 RBRACK : ']' { LeaveSkipWhitespaceRegion(); };
 
@@ -3428,13 +3524,23 @@ MULTIPLY: '*' ('=' { $setType(ASSIGN); })?;
 EXPONENTIATION: "**";
 
 DIVISION: 
-	("/*")=> ML_COMMENT { $setType(Token.SKIP); } |
+	("/*")=> ML_COMMENT
+	{
+		if (!_preserveComments)
+			$setType(Token.SKIP);
+	} |
 	(RE_LITERAL)=> RE_LITERAL { $setType(RE_LITERAL); } |	
 	'/' (
-		('/' (~('\r'|'\n'))* { $setType(Token.SKIP); }) |			
+			('/' (~('\r'|'\n'))*
+			{
+				if (_preserveComments)
+					$setType(SL_COMMENT);
+				else
+					$setType(Token.SKIP);
+			}) |
 			('=' { $setType(ASSIGN); }) |
 		)
-	;
+;
 
 LESS_THAN: '<';
 
@@ -3536,9 +3642,21 @@ SINGLE_QUOTED_STRING :
 	'\''!
 	;
 
+BACKTICK_QUOTED_STRING :
+	'`'!
+	(
+		~('`' | '\r' | '\n') |
+		NEWLINE
+	)*
+	'`'!
+	;
+
 SL_COMMENT:
 	"#" (~('\r'|'\n'))*
-	{ $setType(Token.SKIP); }
+	{
+		if (!_preserveComments)
+			$setType(Token.SKIP);
+	}
 	;
 	
 protected
@@ -3551,7 +3669,10 @@ ML_COMMENT:
 		~('*'|'\r'|'\n')
     )*
     "*/"
-    { $setType(Token.SKIP); }
+	{
+		if (!_preserveComments)
+			$setType(Token.SKIP);
+	}
 	;   
 
 WS :

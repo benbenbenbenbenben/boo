@@ -74,8 +74,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			SlicingExpression other = node as SlicingExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( SlicingExpression)node;
 			if (!Node.Matches(_target, other._target)) return NoMatch("SlicingExpression._target");
 			if (!Node.AllMatch(_indices, other._indices)) return NoMatch("SlicingExpression._indices");
 			return true;
@@ -111,13 +112,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			SlicingExpression clone = (SlicingExpression)FormatterServices.GetUninitializedObject(typeof(SlicingExpression));
+		
+			SlicingExpression clone = new SlicingExpression();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._expressionType = _expressionType;
 			if (null != _target)
 			{
@@ -130,6 +132,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._indices.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

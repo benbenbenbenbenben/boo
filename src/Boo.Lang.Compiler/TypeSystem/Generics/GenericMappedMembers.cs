@@ -234,16 +234,6 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 			get { return SourceMember.IsExtension; }
 		}
 
-		public bool IsBooExtension 
-		{ 
-			get { return SourceMember.IsBooExtension; } 
-		}
-
-		public bool IsClrExtension 
-		{ 
-			get { return SourceMember.IsClrExtension; } 
-		}
-
 		public IType ReturnType
 		{
 			get { return GenericMapping.MapType(SourceMember.ReturnType); }
@@ -258,7 +248,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 			return _parameters;
 		}
 
-		IGenericParameter[] IGenericMethodInfo.GenericParameters
+		IGenericParameter[] IGenericParametersProvider.GenericParameters
 		{
 			get 
 			{
@@ -366,17 +356,6 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 		{
 			get { return SourceMember.IsExtension; }
 		}
-
-		public bool IsBooExtension 
-		{ 
-			get { return SourceMember.IsBooExtension; } 
-		}
-
-		public bool IsClrExtension 
-		{ 
-			get { return SourceMember.IsClrExtension; } 
-		}
-
 	}
 
 	/// <summary>

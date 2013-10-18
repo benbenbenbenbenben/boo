@@ -44,7 +44,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 		internal InternalClass(InternalTypeSystemProvider provider, TypeDefinition typeDefinition, bool isByRef) :
 			base(provider, typeDefinition)
 		{
-			_isByRef = isByRef;
+			IsByRef = isByRef;
 		}
 
 		override public bool IsValueType
@@ -97,9 +97,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 			{
 				IType baseType = TypeSystemServices.GetType(baseTypeReference);
 				if (type == baseType || baseType.IsSubclassOf(type))
-				{
 					return true;
-				}
 			}
 			return _provider.IsSystemObject(type);
 		}

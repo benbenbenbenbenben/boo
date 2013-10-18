@@ -26,6 +26,8 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
+using Boo.Lang.Compiler.TypeSystem.Internal;
+
 namespace Boo.Lang.Compiler.Steps
 {
 	using Boo.Lang.Compiler.Ast;
@@ -40,10 +42,9 @@ namespace Boo.Lang.Compiler.Steps
 
 		override public void Run()
 		{
-			if (0 == Errors.Count)
-			{
-				Visit(CompileUnit);
-			}
+			if (Errors.Count > 0)
+				return;
+			Visit(CompileUnit);
 		}
 
 		override public void OnInterfaceDefinition(InterfaceDefinition node)

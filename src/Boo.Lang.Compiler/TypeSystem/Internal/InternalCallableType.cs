@@ -26,13 +26,12 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
+using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.TypeSystem.Generics;
-using Boo.Lang.Compiler.TypeSystem.Internal;
+using Boo.Lang.Compiler.TypeSystem.Services;
 
-namespace Boo.Lang.Compiler.TypeSystem
+namespace Boo.Lang.Compiler.TypeSystem.Internal
 {
-	using Boo.Lang.Compiler.Ast;
-
 	public class InternalCallableType : InternalClass, ICallableType
 	{
 		CallableSignature _signature;
@@ -41,7 +40,7 @@ namespace Boo.Lang.Compiler.TypeSystem
 			base(provider, typeDefinition)
 		{
 		}
-		
+
 		public CallableSignature GetSignature()
 		{
 			if (null == _signature)
@@ -51,6 +50,11 @@ namespace Boo.Lang.Compiler.TypeSystem
 				_signature = invoke.CallableType.GetSignature();
 			}
 			return _signature;
+		}
+
+		public bool IsAnonymous
+		{
+			get { return _node.ContainsAnnotation(AnonymousCallablesManager.AnonymousCallableTypeAnnotation); }
 		}
 
 		protected override IType CreateConstructedType(IType[] arguments)

@@ -78,8 +78,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			GeneratorExpression other = node as GeneratorExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( GeneratorExpression)node;
 			if (!Node.Matches(_expression, other._expression)) return NoMatch("GeneratorExpression._expression");
 			if (!Node.AllMatch(_declarations, other._declarations)) return NoMatch("GeneratorExpression._declarations");
 			if (!Node.Matches(_iterator, other._iterator)) return NoMatch("GeneratorExpression._iterator");
@@ -127,13 +128,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			GeneratorExpression clone = (GeneratorExpression)FormatterServices.GetUninitializedObject(typeof(GeneratorExpression));
+		
+			GeneratorExpression clone = new GeneratorExpression();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._expressionType = _expressionType;
 			if (null != _expression)
 			{
@@ -156,6 +158,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._filter.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

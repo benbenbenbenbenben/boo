@@ -37,15 +37,9 @@ namespace Boo.Lang.Compiler.TypeSystem
 	public class ExternalMethod : ExternalEntity<MethodBase>, IMethod, IEquatable<ExternalMethod>
 	{
 		protected IParameter[] _parameters;
-
 		private bool? _acceptVarArgs;
-
-		private bool? _isBooExtension;
-		private bool? _isClrExtension;
-
 		private bool? _isPInvoke;
 		private bool? _isMeta;
-
 
 		internal ExternalMethod(IReflectionTypeSystemProvider provider, MethodBase mi) : base(provider, mi)
 		{
@@ -55,45 +49,9 @@ namespace Boo.Lang.Compiler.TypeSystem
 		{
 			get
 			{
-				if (null == _isMeta)
-				{
+				if (_isMeta == null)
 					_isMeta = IsStatic && MetadataUtil.IsAttributeDefined(_memberInfo, typeof(Boo.Lang.MetaAttribute));
-				}
 				return _isMeta.Value;
-			}
-		}
-
-		public bool IsExtension
-		{
-			get
-			{
-				return IsBooExtension || IsClrExtension;
-			}
-		}
-
-		public bool IsBooExtension
-		{
-			get
-			{
-				if (null == _isBooExtension)
-				{
-					_isBooExtension = MetadataUtil.IsAttributeDefined(_memberInfo, Types.BooExtensionAttribute);
-				}
-				return _isBooExtension.Value;
-			}
-		}
-
-		public bool IsClrExtension
-		{
-			get
-			{
-				if (null == _isClrExtension)
-				{
-					_isClrExtension = MetadataUtil.HasClrExtensions()
-							&& IsStatic
-							&& MetadataUtil.IsAttributeDefined(_memberInfo, Types.ClrExtensionAttribute);
-				}
-				return _isClrExtension.Value;
 			}
 		}
 
@@ -101,68 +59,45 @@ namespace Boo.Lang.Compiler.TypeSystem
 		{
 			get
 			{
-				if (null == _isPInvoke)
-				{
-					_isPInvoke = IsStatic && MetadataUtil.IsAttributeDefined(_memberInfo,  Types.DllImportAttribute);
-				}
+				if (_isPInvoke == null)
+					_isPInvoke = IsStatic && MetadataUtil.IsAttributeDefined(_memberInfo, Types.DllImportAttribute);
 				return _isPInvoke.Value;
 			}
 		}
 		
 		public virtual IType DeclaringType
 		{
-			get
-			{
-				return _provider.Map(_memberInfo.DeclaringType);
-			}
+			get { return _provider.Map(_memberInfo.DeclaringType); }
 		}
 		
 		public bool IsStatic
 		{
-			get
-			{
-				return _memberInfo.IsStatic;
-			}
+			get { return _memberInfo.IsStatic; }
 		}
 		
 		public bool IsPublic
 		{
-			get
-			{
-				return _memberInfo.IsPublic;
-			}
+			get { return _memberInfo.IsPublic; }
 		}
 		
 		public bool IsProtected
 		{
-			get
-			{
-				return _memberInfo.IsFamily || _memberInfo.IsFamilyOrAssembly;
-			}
+			get { return _memberInfo.IsFamily || _memberInfo.IsFamilyOrAssembly; }
 		}
 
 		public bool IsPrivate
 		{
-			get
-			{
-				return _memberInfo.IsPrivate;
-			}
+			get { return _memberInfo.IsPrivate; }
 		}
 		
 		public bool IsAbstract
 		{
-			get
-			{
-				return _memberInfo.IsAbstract;
-			}
+			get { return _memberInfo.IsAbstract; }
 		}
 
 		public bool IsInternal
 		{
-			get
-			{
-				return _memberInfo.IsAssembly;
-			}
+			get { return _memberInfo.IsAssembly; }
 		}
 		
 		public bool IsVirtual
@@ -177,21 +112,17 @@ namespace Boo.Lang.Compiler.TypeSystem
 		
 		public bool IsSpecialName
 		{
-			get
-			{
-				return _memberInfo.IsSpecialName;
-			}
+			get { return _memberInfo.IsSpecialName; }
 		}
 		
 		public bool AcceptVarArgs
 		{
 			get
 			{
-				if (null == _acceptVarArgs)
+				if (_acceptVarArgs == null)
 				{
-					ParameterInfo[] parameters = _memberInfo.GetParameters();
-					_acceptVarArgs =
-						parameters.Length > 0 && IsParamArray(parameters[parameters.Length-1]);
+					var parameters = _memberInfo.GetParameters();
+					_acceptVarArgs = parameters.Length > 0 && IsParamArray(parameters[parameters.Length-1]);
 				}
 				return _acceptVarArgs.Value;
 			}
@@ -207,32 +138,23 @@ namespace Boo.Lang.Compiler.TypeSystem
 		
 		override public EntityType EntityType
 		{
-			get
-			{
-				return EntityType.Method;
-			}
+			get { return EntityType.Method; }
 		}
 		
 		public ICallableType CallableType
 		{
-			get
-			{
-				return My<TypeSystemServices>.Instance.GetCallableType(this);
-			}
+			get { return My<TypeSystemServices>.Instance.GetCallableType(this); }
 		}
 
 		public IType Type
 		{
-			get
-			{
-				return CallableType;
-			}
+			get { return CallableType; }
 		}
 		
 		public virtual IParameter[] GetParameters()
 		{
-            if (null != _parameters) return _parameters;
-            return _parameters = _provider.Map(_memberInfo.GetParameters());
+			if (null != _parameters) return _parameters;
+			return _parameters = _provider.Map(_memberInfo.GetParameters());
 		}
 
 		public virtual IType ReturnType
@@ -274,41 +196,31 @@ namespace Boo.Lang.Compiler.TypeSystem
 		
 		override public string ToString()
 		{
-			return TypeSystemServices.GetSignature(this);
+			return _memberInfo.ToString();
 		}
 		
-		ExternalGenericMethodInfo _genericMethodDefinitionInfo = null;		
+		ExternalGenericMethodInfo _genericMethodDefinitionInfo;		
 		public IGenericMethodInfo GenericInfo
 		{
 			get
 			{
-				if (MethodInfo.IsGenericMethodDefinition)
-				{
-					if (_genericMethodDefinitionInfo == null)
-					{
-						_genericMethodDefinitionInfo = 
-							new ExternalGenericMethodInfo(_provider, this);
-					}
-					return _genericMethodDefinitionInfo;
-				}
-				return null;
+				if (!MethodInfo.IsGenericMethodDefinition)
+					return null;
+
+				return _genericMethodDefinitionInfo ??
+				       (_genericMethodDefinitionInfo = new ExternalGenericMethodInfo(_provider, this));
 			}
 		}
 
-		ExternalConstructedMethodInfo _genericMethodInfo = null;
+		ExternalConstructedMethodInfo _genericMethodInfo;
 		public virtual IConstructedMethodInfo ConstructedInfo
 		{
 			get
 			{
-				if (MethodInfo.IsGenericMethod)
-				{
-					if (_genericMethodInfo == null)
-					{
-						_genericMethodInfo = new ExternalConstructedMethodInfo(_provider, this);
-					}
-					return _genericMethodInfo;
-				}
-				return null;
+				if (!MethodInfo.IsGenericMethod)
+					return null;
+
+				return _genericMethodInfo ?? (_genericMethodInfo = new ExternalConstructedMethodInfo(_provider, this));
 			}
 		}
 

@@ -27,6 +27,7 @@
 #endregion
 
 using System;
+using Boo.Lang.Compiler.TypeSystem.Internal;
 using Boo.Lang.Compiler.TypeSystem.Services;
 
 namespace Boo.Lang.Compiler.Steps
@@ -35,12 +36,7 @@ namespace Boo.Lang.Compiler.Steps
 	using Boo.Lang.Compiler.TypeSystem;
 	
 	public class ResolveTypeReferences : AbstractNamespaceSensitiveVisitorCompilerStep, ITypeMemberReifier, ITypeReferenceReifier
-	{
-		override public void Run()
-		{
-			Visit(CompileUnit.Modules);
-		}
-		
+	{	
 		public override void OnMethod(Method node)
 		{
 			// If method is generic, enter its namespace			
@@ -56,7 +52,7 @@ namespace Boo.Lang.Compiler.Steps
 			}
 		}
 
-		override public void OnArrayTypeReference(ArrayTypeReference node)
+		override public void LeaveArrayTypeReference(ArrayTypeReference node)
 		{
 			NameResolutionService.ResolveArrayTypeReference(node);
 		}
@@ -66,7 +62,7 @@ namespace Boo.Lang.Compiler.Steps
 			NameResolutionService.ResolveSimpleTypeReference(node);
 		}
 
-		override public void OnGenericTypeReference(GenericTypeReference node)
+		override public void LeaveGenericTypeReference(GenericTypeReference node)
 		{
 			NameResolutionService.ResolveSimpleTypeReference(node);
 		}

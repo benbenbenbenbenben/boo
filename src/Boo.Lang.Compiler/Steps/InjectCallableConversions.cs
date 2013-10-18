@@ -29,14 +29,13 @@
 using System.Linq;
 using System.Runtime.Remoting.Messaging;
 using Boo.Lang.Compiler.TypeSystem.Builders;
-using Boo.Lang.Runtime;
-
+using Boo.Lang.Compiler.TypeSystem.Core;
+using Boo.Lang.Compiler.Util;
+using Boo.Lang.Compiler.Ast;
+using Boo.Lang.Compiler.TypeSystem;
+	
 namespace Boo.Lang.Compiler.Steps
 {
-	using System;
-	using Boo.Lang.Compiler.Ast;
-	using Boo.Lang.Compiler.TypeSystem;
-	
 	public class InjectCallableConversions : AbstractVisitorCompilerStep
 	{
 		IMethod _current;
@@ -44,37 +43,174 @@ namespace Boo.Lang.Compiler.Steps
 		IType _asyncResultType;
 		
 		IMethod _asyncResultTypeAsyncDelegateGetter;
-		
-		Boo.Lang.List _adaptors;
+
+		readonly List<AdaptorRecord> _adaptors = new List<AdaptorRecord>();
 		
 		override public void Run()
 		{
-			if (0 == Errors.Count)
+			if (Errors.Count != 0)
+				return;
+
+			Visit(CompileUnit);
+		}
+
+		override public void LeaveExpressionStatement(ExpressionStatement node)
+		{
+			// allow interactive evaluation of closures (see booish)
+			var converted = ConvertExpression(node.Expression);
+			if (converted != null)
+				node.Expression = converted;
+		}
+
+		override public void LeaveReturnStatement(ReturnStatement node)
+		{
+			Expression expression = node.Expression;
+			if (null == expression)
+				return;
+
+			if (!HasReturnType(_current))
+				return;
+
+			Expression newExpression = Convert(_current.ReturnType, expression);
+			if (null == newExpression)
+				return;
+
+			node.Expression = newExpression;
+		}
+
+		override public void LeaveExpressionPair(ExpressionPair pair)
+		{
+			Expression converted = ConvertExpression(pair.First);
+			if (null != converted)
 			{
-				Initialize();
-				Visit(CompileUnit);
+				pair.First = converted;
+			}
+
+			converted = ConvertExpression(pair.Second);
+			if (null != converted)
+			{
+				pair.Second = converted;
+			}
+		}
+
+		override public void LeaveListLiteralExpression(ListLiteralExpression node)
+		{
+			ConvertExpressions(node.Items);
+		}
+
+		override public void LeaveArrayLiteralExpression(ArrayLiteralExpression node)
+		{
+			IType elementType = GetExpressionType(node).ElementType;
+			for (int i = 0; i < node.Items.Count; ++i)
+			{
+				Expression converted = Convert(elementType, node.Items[i]);
+				if (null != converted)
+				{
+					node.Items.ReplaceAt(i, converted);
+				}
+			}
+		}
+
+		override public void LeaveMethodInvocationExpression(MethodInvocationExpression node)
+		{
+			var parameters = ParametersFor(node.Target);
+			if (parameters == null)
+				return;
+			ConvertMethodInvocation(node, parameters);
+		}
+
+		private static IParameter[] ParametersFor(Expression callableExpression)
+		{
+			var entity = callableExpression.Entity as IMethod;
+			if (entity != null)
+				return entity.GetParameters();
+
+			var type = callableExpression.ExpressionType as ICallableType;
+			if (type != null)
+				return type.GetSignature().Parameters;
+
+			return null;
+		}
+
+		override public void LeaveMemberReferenceExpression(MemberReferenceExpression node)
+		{
+			if (IsEndInvokeOnStandaloneMethodReference(node) && AstUtil.IsTargetOfMethodInvocation(node))
+			{
+				ReplaceEndInvokeTargetByGetAsyncDelegate((MethodInvocationExpression)node.ParentNode);
+				return;
+			}
+
+			var newTarget = ConvertExpression(node.Target);
+			if (null != newTarget)
+				node.Target = newTarget;
+		}
+
+		override public void LeaveCastExpression(CastExpression node)
+		{
+			var newExpression = Convert(node.ExpressionType, node.Target);
+			if (newExpression != null)
+				node.Target = newExpression;
+		}
+
+		public override void LeaveConditionalExpression(ConditionalExpression node)
+		{
+			var newTrueValue = Convert(node.ExpressionType, node.TrueValue);
+			if (newTrueValue != null)
+				node.TrueValue = newTrueValue;
+			var newFalseValue = Convert(node.ExpressionType, node.FalseValue);
+			if (newFalseValue != null)
+				node.FalseValue = newFalseValue;
+		}
+
+		override public void LeaveTryCastExpression(TryCastExpression node)
+		{
+			Expression newExpression = Convert(node.ExpressionType, node.Target);
+			if (null != newExpression)
+				node.Target = newExpression;
+		}
+
+		override public void LeaveBinaryExpression(BinaryExpression node)
+		{
+			if (BinaryOperatorType.Assign != node.Operator)
+				return;
+
+			Expression newRight = Convert(node.Left.ExpressionType, node.Right);
+			if (null != newRight)
+				node.Right = newRight;
+		}
+
+		override public void LeaveGeneratorExpression(GeneratorExpression node)
+		{
+			Expression newExpression = Convert(
+										GetConcreteExpressionType(node.Expression),
+										node.Expression);
+			if (null != newExpression)
+			{
+				node.Expression = newExpression;
 			}
 		}
 		
-		void Initialize()
+		void InitializeAsyncResultType()
 		{
-			Type type = typeof(AsyncResult);
+			if (_asyncResultType != null)
+				return;
+
+			var type = typeof(AsyncResult);
 			_asyncResultType = TypeSystemServices.Map(type);
 			_asyncResultTypeAsyncDelegateGetter = TypeSystemServices.Map(Methods.GetterOf<AsyncResult, object>(r => r.AsyncDelegate));
-			_adaptors = new Boo.Lang.List();
 		}
 		
 		override public void Dispose()
 		{
 			_asyncResultType = null;
 			_asyncResultTypeAsyncDelegateGetter = null;
-			_adaptors = null;
+			_adaptors.Clear();
 			base.Dispose();
 		}
 		
 		override public void OnMethod(Method node)
 		{
-			_current = (IMethod)GetEntity(node);
+			_current = GetEntity(node);
 			Visit(node.Body);
 		}
 		
@@ -88,14 +224,13 @@ namespace Boo.Lang.Compiler.Steps
 			IEntity entity = GetEntity(node);
 			return EntityType.Method == entity.EntityType;
 		}
-		
-		bool IsNotTargetOfMethodInvocation(Expression node)
+
+		static bool IsNotTargetOfMethodInvocation(Expression node)
 		{
-			MethodInvocationExpression mie = node.ParentNode as MethodInvocationExpression;
-			if (null != mie) return mie.Target != node;
-			return true;
+			var mie = node.ParentNode as MethodInvocationExpression;
+			return mie == null || mie.Target != node;
 		}
-		
+
 		bool IsStandaloneMethodReference(Expression node)
 		{
 			return
@@ -104,86 +239,7 @@ namespace Boo.Lang.Compiler.Steps
                 && IsNotTargetOfMethodInvocation(node);
 		}
 		
-		override public void LeaveExpressionStatement(ExpressionStatement node)
-		{
-			// allow interactive evaluation of closures (see booish)
-			Expression converted = ConvertExpression(node.Expression);
-			if (null != converted)
-			{
-				node.Expression = converted;
-			}
-		}
-		
-		override public void LeaveReturnStatement(ReturnStatement node)
-		{
-			Expression expression = node.Expression;
-			if (null == expression)
-				return;
-
-			if (!HasReturnType(_current))
-				return;
-			
-			Expression newExpression = Convert(_current.ReturnType, expression);
-			if (null == newExpression)
-				return;
-
-			node.Expression = newExpression;
-		}
-		
-		override public void LeaveExpressionPair(ExpressionPair pair)
-		{
-			Expression converted = ConvertExpression(pair.First);
-			if (null != converted)
-			{
-				pair.First = converted;
-			}
-			
-			converted = ConvertExpression(pair.Second);
-			if (null != converted)
-			{
-				pair.Second = converted;
-			}
-		}
-		
-		override public void LeaveListLiteralExpression(ListLiteralExpression node)
-		{
-			ConvertExpressions(node.Items);
-		}
-		
-		override public void LeaveArrayLiteralExpression(ArrayLiteralExpression node)
-		{
-			IType elementType = ((IArrayType)GetExpressionType(node)).ElementType;
-			for (int i=0; i<node.Items.Count; ++i)
-			{
-				Expression converted = Convert(elementType, node.Items[i]);
-				if (null != converted)
-				{
-					node.Items.ReplaceAt(i, converted);
-				}
-			}
-		}
-		
-		override public void LeaveMethodInvocationExpression(MethodInvocationExpression node)
-		{
-			IParameter[] parameters = null;
-			IMethod entity = node.Target.Entity as IMethod;
-			if (null != entity)
-			{
-				parameters = entity.GetParameters();
-			}
-			else
-			{
-				ICallableType type = node.Target.ExpressionType as ICallableType;
-				if (null == type)
-				{
-					return;
-				}
-				parameters = type.GetSignature().Parameters;
-			}
-			ConvertMethodInvocation(node, parameters);
-		}
-		
-		void ConvertMethodInvocation(MethodInvocationExpression node, IParameter[] parameters)
+		private void ConvertMethodInvocation(MethodInvocationExpression node, IParameter[] parameters)
 		{
 			ExpressionCollection arguments = node.Arguments;
 			for (int i=0; i<parameters.Length; ++i)
@@ -195,61 +251,7 @@ namespace Boo.Lang.Compiler.Steps
 				}
 			}
 		}
-		
-		override public void LeaveMemberReferenceExpression(MemberReferenceExpression node)
-		{
-			if (IsEndInvokeOnStandaloneMethodReference(node) &&
-				AstUtil.IsTargetOfMethodInvocation(node))
-			{
-				ReplaceEndInvokeTargetByGetAsyncDelegate((MethodInvocationExpression)node.ParentNode);
-			}
-			else
-			{
-				Expression newTarget = ConvertExpression(node.Target);
-				if (null != newTarget)
-				{
-					node.Target = newTarget;
-				}
-			}
-		}
-		
-		override public void LeaveCastExpression(CastExpression node)
-		{
-			Expression newExpression = Convert(node.ExpressionType, node.Target);
-			if (null != newExpression)
-			{
-				node.Target = newExpression;
-			}
-		}
-		
-		override public void LeaveTryCastExpression(TryCastExpression node)
-		{
-			Expression newExpression = Convert(node.ExpressionType, node.Target);
-			if (null != newExpression)
-				node.Target = newExpression;
-		}
-		
-		override public void LeaveBinaryExpression(BinaryExpression node)
-		{
-		    if (BinaryOperatorType.Assign != node.Operator)
-                return;
 
-		    Expression newRight = Convert(node.Left.ExpressionType, node.Right);
-		    if (null != newRight)
-		        node.Right = newRight;
-		}
-		
-		override public void LeaveGeneratorExpression(GeneratorExpression node)
-		{
-			Expression newExpression = Convert(
-										GetConcreteExpressionType(node.Expression),
-										node.Expression);
-			if (null != newExpression)
-			{
-				node.Expression = newExpression;
-			}
-		}
-		
 		void ConvertExpressions(ExpressionCollection items)
 		{
 			for (int i=0; i<items.Count; ++i)
@@ -270,38 +272,31 @@ namespace Boo.Lang.Compiler.Steps
 		Expression Convert(IType expectedType, Expression argument)
 		{
 			if (IsStandaloneMethodReference(argument))
+				return ConvertMethodReference(expectedType, argument);
+
+			var callableType = expectedType as ICallableType;
+			if (callableType != null)
 			{
-				if (IsCallableType(expectedType))
-				{
-					ICallableType argumentType = (ICallableType)GetExpressionType(argument);
-					if (argumentType.GetSignature() !=
-						((ICallableType)expectedType).GetSignature())
-					{
-						return Adapt((ICallableType)expectedType,
-							CreateDelegate(GetConcreteExpressionType(argument), argument));
-					}
-					return CreateDelegate(expectedType, argument);
-				}
-				else
-				{
-					return CreateDelegate(GetConcreteExpressionType(argument), argument);
-				}
-			}
-			else
-			{
-				if (IsCallableType(expectedType))
-				{
-					IType argumentType = GetExpressionType(argument);
-					if (Null.Default != argumentType &&
-						expectedType != argumentType)
-					{
-						return Adapt((ICallableType)expectedType, argument);
-					}
-				}
+				var argumentType = GetExpressionType(argument);
+				if (expectedType != argumentType && !argumentType.IsNull())
+					return Adapt(callableType, argument);
 			}
 			return null;
 		}
-		
+
+		private Expression ConvertMethodReference(IType expectedType, Expression argument)
+		{
+			var expectedCallable = expectedType as ICallableType;
+			if (expectedCallable != null)
+			{
+				var argumentType = (ICallableType) GetExpressionType(argument);
+				if (argumentType.GetSignature() != expectedCallable.GetSignature())
+					return Adapt(expectedCallable, CreateDelegate(GetConcreteExpressionType(argument), argument));
+				return CreateDelegate(expectedType, argument);
+			}
+			return CreateDelegate(GetConcreteExpressionType(argument), argument);
+		}
+
 		Expression Adapt(ICallableType expected, Expression callable)
 		{
 			ICallableType actual = GetExpressionType(callable) as ICallableType;
@@ -318,10 +313,7 @@ namespace Boo.Lang.Compiler.Steps
 		
 		ClassDefinition GetAdaptor(ICallableType to, ICallableType from)
 		{
-			ClassDefinition adaptor = FindAdaptor(to, from);
-			if (null == adaptor)
-				adaptor = CreateAdaptor(to, from);
-			return adaptor;
+			return FindAdaptor(to, from) ?? CreateAdaptor(to, from);
 		}
 		
 		sealed class AdaptorRecord
@@ -341,12 +333,8 @@ namespace Boo.Lang.Compiler.Steps
 		ClassDefinition FindAdaptor(ICallableType to, ICallableType from)
 		{
 			foreach (AdaptorRecord record in _adaptors)
-			{
 				if (from == record.From && to == record.To)
-				{
 					return record.Adaptor;
-				}
-			}
 			return null;
 		}
 		
@@ -426,21 +414,18 @@ namespace Boo.Lang.Compiler.Steps
 		
 		void ReplaceEndInvokeTargetByGetAsyncDelegate(MethodInvocationExpression node)
 		{
-			Expression asyncResult = node.Arguments.Last;
-			MemberReferenceExpression endInvoke = (MemberReferenceExpression)node.Target;
-			IType callableType = ((IMember)endInvoke.Entity).DeclaringType;
+			InitializeAsyncResultType();
+
+			var asyncResult = node.Arguments.Last;
+			var endInvoke = (MemberReferenceExpression)node.Target;
+			var callableType = ((IMember)endInvoke.Entity).DeclaringType;
 			
 			endInvoke.Target = CodeBuilder.CreateCast(callableType,
 									CodeBuilder.CreateMethodInvocation(
 										CodeBuilder.CreateCast(_asyncResultType, asyncResult.CloneNode()),
 										_asyncResultTypeAsyncDelegateGetter));
 		}
-		
-		bool IsCallableType(IType type)
-		{
-			return type is ICallableType;
-		}
-		
+
 		Expression CreateDelegate(IType type, Expression source)
 		{
 			var method = (IMethod)GetEntity(source);
@@ -453,8 +438,8 @@ namespace Boo.Lang.Compiler.Steps
 									target,
 									CodeBuilder.CreateAddressOfExpression(method));
 		}
-		
-		IType GetConcreteType(IType type)
+
+		static IType GetConcreteType(IType type)
 		{
 			var anonymous = type as AnonymousCallableType;
 			return null == anonymous ? type : anonymous.ConcreteType;

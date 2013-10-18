@@ -74,8 +74,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			ArrayTypeReference other = node as ArrayTypeReference;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( ArrayTypeReference)node;
 			if (_isPointer != other._isPointer) return NoMatch("ArrayTypeReference._isPointer");
 			if (!Node.Matches(_elementType, other._elementType)) return NoMatch("ArrayTypeReference._elementType");
 			if (!Node.Matches(_rank, other._rank)) return NoMatch("ArrayTypeReference._rank");
@@ -105,13 +106,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			ArrayTypeReference clone = (ArrayTypeReference)FormatterServices.GetUninitializedObject(typeof(ArrayTypeReference));
+		
+			ArrayTypeReference clone = new ArrayTypeReference();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._isPointer = _isPointer;
 			if (null != _elementType)
 			{
@@ -124,6 +126,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._rank.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

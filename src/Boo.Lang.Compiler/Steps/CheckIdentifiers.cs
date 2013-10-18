@@ -33,11 +33,6 @@ namespace Boo.Lang.Compiler.Steps
 
 	public class CheckIdentifiers : AbstractVisitorCompilerStep
 	{
-		override public void Run()
-		{
-			Visit(CompileUnit);
-		}
-		
 		internal static bool IsValidName(string name)
 		{
 			if (string.IsNullOrEmpty(name))
@@ -50,10 +45,9 @@ namespace Boo.Lang.Compiler.Steps
 		
 		private void CheckName(Node node, string name)
 		{
-			if (!IsValidName(name))
-			{
-				Errors.Add(CompilerErrorFactory.InvalidName(node, name));
-			}
+			if (node.IsSynthetic || IsValidName(name))
+				return;
+			Errors.Add(CompilerErrorFactory.InvalidName(node, name));
 		}
 
 		private void CheckParameterUniqueness(Method method)
@@ -65,7 +59,7 @@ namespace Boo.Lang.Compiler.Steps
 				{
 					Errors.Add(
 						CompilerErrorFactory.DuplicateParameterName(
-							parameter, parameter.Name, GetEntity(method).ToString()));
+							parameter, parameter.Name, GetEntity(method)));
 				}				
 				parameters.Add(parameter.Name);
 			}
@@ -96,30 +90,36 @@ namespace Boo.Lang.Compiler.Steps
 			CheckName(node,node.Name);
 		}
 		
-		override public void LeaveMemberReferenceExpression(MemberReferenceExpression node)
+		override public void OnMemberReferenceExpression(MemberReferenceExpression node)
 		{
-			CheckName(node,node.Name);
+			base.OnMemberReferenceExpression(node);
+
+			CheckName(node, node.Name);
 		}
 		
-		override public void LeaveLabelStatement(LabelStatement node)
+		override public void OnLabelStatement(LabelStatement node)
 		{
-			CheckName(node,node.Name);
+			base.OnLabelStatement(node);
+
+			CheckName(node, node.Name);
 		}
 		
-		override public void LeaveDeclaration(Declaration node)
+		override public void OnDeclaration(Declaration node)
 		{
-			// Special exemption made for anonymous exception handlers
+			base.OnDeclaration(node);
+
+			// Special exemption made for anonymous exception handlers);
 			if(!(node.ParentNode is ExceptionHandler) ||
 			   ((node.ParentNode as ExceptionHandler).Flags 
 			    & ExceptionHandlerFlags.Anonymous) == ExceptionHandlerFlags.None)
 			{
-				CheckName(node,node.Name);
+				CheckName(node, node.Name);
 			}
 		}
 		
 		override public void LeaveAttribute(Attribute node)
 		{
-			CheckName(node,node.Name);
+			CheckName(node, node.Name);
 		}
 
 		public override void LeaveConstructor(Constructor node)

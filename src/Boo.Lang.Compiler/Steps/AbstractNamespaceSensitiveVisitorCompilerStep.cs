@@ -26,7 +26,6 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-using Boo.Lang.Compiler;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.TypeSystem;
 using Boo.Lang.Compiler.TypeSystem.Internal;
@@ -56,7 +55,7 @@ namespace Boo.Lang.Compiler.Steps
 			NameResolutionService.LeaveNamespace();
 		}
 
-		override public void OnModule(Boo.Lang.Compiler.Ast.Module module)
+		override public void OnModule(Module module)
 		{
 			EnterNamespace(InternalModule.ScopeFor(module));
 			VisitTypeDefinitionBody(module);

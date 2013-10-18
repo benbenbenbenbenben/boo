@@ -72,8 +72,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			HashLiteralExpression other = node as HashLiteralExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( HashLiteralExpression)node;
 			if (!Node.AllMatch(_items, other._items)) return NoMatch("HashLiteralExpression._items");
 			return true;
 		}
@@ -103,13 +104,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			HashLiteralExpression clone = (HashLiteralExpression)FormatterServices.GetUninitializedObject(typeof(HashLiteralExpression));
+		
+			HashLiteralExpression clone = new HashLiteralExpression();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._expressionType = _expressionType;
 			if (null != _items)
 			{
@@ -117,6 +119,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._items.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

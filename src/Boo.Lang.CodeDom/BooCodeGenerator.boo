@@ -64,8 +64,18 @@ class BooCodeGenerator(CodeGenerator):
 		get:
 			return "null"	
 
+	// workaround for MS's implementation around code snippets
+	protected BooIndent as int:
+		get:
+			return _booIndent
+		set:
+			_booIndent = value
+			Indent = value
+	_booIndent = 0
+
 	protected override def OutputType(typeRef as CodeTypeReference):
 		Output.Write(GetTypeOutput(typeRef))
+
 
 	protected override def GenerateArrayCreateExpression(exp as CodeArrayCreateExpression) :
 		if exp.Initializers is not null and exp.Size == 0 and exp.SizeExpression is null:
@@ -298,20 +308,20 @@ class BooCodeGenerator(CodeGenerator):
 	protected override def GenerateSnippetMember(e as CodeSnippetTypeMember) :
 		if e.CustomAttributes:
 			OutputAttributes(e.CustomAttributes, null, false)
-		Output.WriteLine(FixIndent(e.Text, Options.IndentString, Indent, false))
+		Output.WriteLine(FixIndent(e.Text, Options.IndentString, BooIndent, false))
 	
 	protected override def GenerateSnippetExpression(e as CodeSnippetExpression) :
 		//Output.Write("("+e.Value+")")
 		Output.Write(e.Value)
 		
 	protected override def GenerateSnippetCompileUnit(e as CodeSnippetCompileUnit) :
-		Output.WriteLine(FixIndent(e.Value, Options.IndentString, Indent, false))
+		Output.WriteLine(FixIndent(e.Value, Options.IndentString, BooIndent, false))
 		
 	protected override def GenerateSnippetStatement(e as CodeSnippetStatement) :
 		if _NET_2_0:
 			Output.WriteLine(e.Value)
 		else:
-			Output.WriteLine(FixIndent(e.Value, Options.IndentString, Indent, false))
+			Output.WriteLine(FixIndent(e.Value, Options.IndentString, BooIndent, false))
 		
 	protected override def GenerateEntryPointMethod(e as CodeEntryPointMethod, c as CodeTypeDeclaration) :
 		Method(e, "Main")
@@ -447,8 +457,9 @@ class BooCodeGenerator(CodeGenerator):
 		EndBlock()
 
 	protected override def GenerateNamespaceStart(e as CodeNamespace) :
-		if e and e.Name and e.Name != string.Empty:
-			Output.WriteLine("namespace ${e.Name}")	
+		if e is null or string.IsNullOrEmpty(e.Name):
+			return
+		Output.WriteLine("namespace ${e.Name}")	
 		
 	protected override def GenerateNamespaceEnd(e as CodeNamespace) :
 		pass
@@ -604,6 +615,9 @@ class BooCodeGenerator(CodeGenerator):
 	
 	private def OutputAttribute(attribute as CodeAttributeDeclaration):
 		Output.Write(attribute.Name.Replace ('+', '.'))
+		if len(attribute.Arguments) == 0:
+			return
+			
 		Output.Write('(')
 		first = true
 		for argument as CodeAttributeArgument in attribute.Arguments:
@@ -663,7 +677,7 @@ class BooCodeGenerator(CodeGenerator):
 			Output.WriteLine("//option WhiteSpaceAgnostic")
 			Output.WriteLine()
 			
-		super.GenerateCompileUnitStart(compileUnit)
+		//super.GenerateCompileUnitStart(compileUnit)
 
 	protected override def GenerateCompileUnit(compileUnit as CodeCompileUnit):
 		GenerateCompileUnitStart(compileUnit)
@@ -680,13 +694,13 @@ class BooCodeGenerator(CodeGenerator):
 		
 	protected virtual def BeginBlock():
 		Output.WriteLine(":")
-		++Indent
+		++BooIndent
 		
 	protected virtual def EndBlock():
 		EndBlock(true)
 		
 	protected virtual def EndBlock(realend as bool):
-		--Indent
+		--BooIndent
 		if realend:
 			End()
 			

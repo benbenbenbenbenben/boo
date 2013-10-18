@@ -58,8 +58,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			LiteralExpression other = node as LiteralExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( LiteralExpression)node;
 			return true;
 		}
 
@@ -76,15 +77,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			LiteralExpression clone = (LiteralExpression)FormatterServices.GetUninitializedObject(typeof(LiteralExpression));
-			clone._lexicalInfo = _lexicalInfo;
-			clone._endSourceLocation = _endSourceLocation;
-			clone._documentation = _documentation;
-			clone._entity = _entity;
-			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
-			clone._expressionType = _expressionType;
-			return clone;
+
+			throw new System.InvalidOperationException("Cannot clone abstract class: LiteralExpression");
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

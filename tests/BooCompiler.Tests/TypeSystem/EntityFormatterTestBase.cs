@@ -9,27 +9,27 @@ namespace BooCompiler.Tests.TypeSystem
 	public abstract class EntityFormatterTestBase : AbstractTypeSystemTest
 	{
 		[Test]
-		public void SimpleTypeToStringGoesThroughEntityFormatter()
+		public void SimpleTypeDisplayNameGoesThroughEntityFormatter()
 		{
-			AssertToStringGoesThroughEntityFormatter(SimpleType());
+			AssertDisplayNameGoesThroughEntityFormatter(SimpleType());
 		}
 
 		[Test]
-		public void ArrayTypeToStringGoesThroughEntityFormatter()
+		public void ArrayTypeDisplayNameGoesThroughEntityFormatter()
 		{
-			AssertToStringGoesThroughEntityFormatter(ArrayType());
+			AssertDisplayNameGoesThroughEntityFormatter(ArrayType());
 		}
 
 		[Test]
-		public void CallableTypeToStringGoesThroughEntityFormatter()
+		public void CallableTypeDisplayNameGoesThroughEntityFormatter()
 		{
-			AssertToStringGoesThroughEntityFormatter(CallableType());
+			AssertDisplayNameGoesThroughEntityFormatter(CallableType());
 		}
 
 		[Test]
-		public void GenericTypeToStringGoesThroughEntityFormatter()
+		public void GenericTypeDisplayNameGoesThroughEntityFormatter()
 		{
-			AssertToStringGoesThroughEntityFormatter(GenericType());
+			AssertDisplayNameGoesThroughEntityFormatter(GenericType());
 		}
 
 		protected abstract IType SimpleType();
@@ -37,16 +37,15 @@ namespace BooCompiler.Tests.TypeSystem
 		protected abstract IType GenericType();
 		protected abstract IType ArrayType();
 
-		protected static void AssertToStringGoesThroughEntityFormatter(IType entity)
+		protected static void AssertDisplayNameGoesThroughEntityFormatter(IType entity)
 		{
 			var mock = new Mock<EntityFormatter>();
-			new ClosedEnvironment(mock.Object).Run(() =>
-         	{
+			ActiveEnvironment.With(new ClosedEnvironment(mock.Object), () => {
          		mock.Setup(formatter => formatter.FormatType(entity))
          			.Returns("")
          			.AtMostOnce();
 
-         		entity.ToString();
+         		entity.DisplayName();
 
          		mock.VerifyAll();
          	});

@@ -78,8 +78,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			CallableDefinition other = node as CallableDefinition;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( CallableDefinition)node;
 			if (_modifiers != other._modifiers) return NoMatch("CallableDefinition._modifiers");
 			if (_name != other._name) return NoMatch("CallableDefinition._name");
 			if (!Node.AllMatch(_attributes, other._attributes)) return NoMatch("CallableDefinition._attributes");
@@ -156,13 +157,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			CallableDefinition clone = (CallableDefinition)FormatterServices.GetUninitializedObject(typeof(CallableDefinition));
+		
+			CallableDefinition clone = new CallableDefinition();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._modifiers = _modifiers;
 			clone._name = _name;
 			if (null != _attributes)
@@ -191,6 +193,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._returnTypeAttributes.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

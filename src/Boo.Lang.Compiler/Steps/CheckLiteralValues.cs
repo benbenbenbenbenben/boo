@@ -31,41 +31,54 @@ using Boo.Lang.Compiler.TypeSystem;
 
 namespace Boo.Lang.Compiler.Steps
 {
-	public class CheckLiteralValues : AbstractVisitorCompilerStep
+	public class CheckLiteralValues : AbstractFastVisitorCompilerStep
 	{
-		override public void Run()
-		{
-			if (Errors.Count > 0)
-				return;
-			Visit(CompileUnit);
-		}
+		private bool _checked;
 
 		override public void OnModule(Module node)
 		{
 			Visit(node.Members);
 		}
 
-		override public void LeaveArrayLiteralExpression(ArrayLiteralExpression node)
+		override public void OnBlock(Block block)
 		{
-			IType expectedType = GetExpressionType(node).ElementType;
+			var currentChecked = _checked;
+			_checked = AstAnnotations.IsChecked(block, Parameters.Checked);
+
+			Visit(block.Statements);
+
+			_checked = currentChecked;
+		}
+
+		override public void OnArrayLiteralExpression(ArrayLiteralExpression node)
+		{
+			if (!_checked)
+				return;
+
+			base.OnArrayLiteralExpression(node);
+
+			var expectedType = GetExpressionType(node).ElementType;
 			if (!TypeSystemServices.IsPrimitiveNumber(expectedType))
 				return;
 
-			foreach (Expression item in node.Items)
+			foreach (var item in node.Items)
 			{
-				IType itemType = item.ExpressionType;
-				if (item is LiteralExpression)
+				var integerLiteral = item as IntegerLiteralExpression;
+				if (integerLiteral != null)
 				{
-					if (item.NodeType == NodeType.IntegerLiteralExpression)
-						AssertLiteralInRange((IntegerLiteralExpression) item, expectedType);
-					if (expectedType != itemType)
-						BindExpressionType(item, expectedType);
+					AssertLiteralInRange(integerLiteral, expectedType);
+					continue;
 				}
 			}
 		}
 
-		override public void LeaveBinaryExpression(BinaryExpression node)
+		override public void OnBinaryExpression(BinaryExpression node)
 		{
+			if (!_checked)
+				return;
+
+			base.OnBinaryExpression(node);
+
 			if (node.Operator != BinaryOperatorType.Assign
 			    || node.Right.NodeType != NodeType.IntegerLiteralExpression)
 				return;
@@ -77,8 +90,13 @@ namespace Boo.Lang.Compiler.Steps
 			AssertLiteralInRange((IntegerLiteralExpression) node.Right, expectedType);
 		}
 
-		override public void LeaveMethodInvocationExpression(MethodInvocationExpression node)
+		override public void OnMethodInvocationExpression(MethodInvocationExpression node)
 		{
+			if (!_checked)
+				return;
+
+			base.OnMethodInvocationExpression(node);
+
 			if (0 == node.Arguments.Count)
 				return;
 
@@ -100,8 +118,13 @@ namespace Boo.Lang.Compiler.Steps
 			}
 		}
 
-		public override void LeaveExpressionStatement(ExpressionStatement node)
+		public override void OnExpressionStatement(ExpressionStatement node)
 		{
+			if (!_checked)
+				return;
+
+			base.OnExpressionStatement(node);
+
 			IntegerLiteralExpression literal = node.Expression as IntegerLiteralExpression;
 			if (null == literal)
 				return;

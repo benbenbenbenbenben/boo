@@ -27,6 +27,7 @@
 #endregion
 
 import System
+import System.Linq.Enumerable
 import System.IO
 import Boo.Lang.Compiler
 import Boo.Lang.Compiler.Pipelines
@@ -115,7 +116,7 @@ class Model:
 		return false
 
 	def GetCollectionItemType(node as ClassDefinition):
-		attribute = node.Attributes.Get("collection")[0]
+		attribute = node.Attributes.Get("collection").First()
 		reference as ReferenceExpression = attribute.Arguments[0]
 		return reference.Name
 
@@ -154,7 +155,7 @@ class CodeTemplate(AbstractTemplate):
 		name = field.Name
 		name = name[0:1].ToLower() + name[1:]
 		if name in ("namespace", "operator"):
-			name += "_"
+			return "@" + name
 		return name
 
 def read(fname as string):
@@ -217,7 +218,9 @@ start = date.Now
 
 model = Model(parse("ast.model.boo"))
 applyModelTemplate(model, "IAstVisitor.cs", "IAstVisitor.Generated.cs", true)
+applyModelTemplate(model, "DepthFirstGuide.cs", "Impl/DepthFirstGuide.cs", true)
 applyModelTemplate(model, "DepthFirstVisitor.cs", "Impl/DepthFirstVisitor.cs", true)
+applyModelTemplate(model, "FastDepthFirstVisitor.cs", "Impl/FastDepthFirstVisitor.cs", true)
 applyModelTemplate(model, "DepthFirstTransformer.cs", "Impl/DepthFirstTransformer.cs", true)
 applyModelTemplate(model, "CodeSerializer.cs", "Impl/CodeSerializer.cs", true)
 applyModelTemplate(model, "NodeType.cs", "NodeType.Generated.cs", true)

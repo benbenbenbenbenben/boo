@@ -26,19 +26,18 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-using System;
+using Boo.Lang.Compiler.Steps;
 
 namespace Boo.Lang.Compiler.Pipelines
 {
-	using Boo.Lang.Compiler.Steps;
-
 	public class ExpandMacros : Parse
 	{
 		public ExpandMacros()
 		{
 			Add(new PreErrorChecking());
 
-			Add(new MergePartialClasses());
+			var mergePartialTypes = new MergePartialTypes();
+			Add(mergePartialTypes);
 
 			Add(new InitializeNameResolutionService());
 			Add(new IntroduceGlobalNamespaces());
@@ -50,6 +49,8 @@ namespace Boo.Lang.Compiler.Pipelines
 			Add(new BindBaseTypes());
 
 			Add(new MacroAndAttributeExpansion());
+			Add(new RemoveEmptyBlocks());
+			Add(mergePartialTypes);
 		}
 	}
 }

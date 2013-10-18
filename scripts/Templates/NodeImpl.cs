@@ -58,8 +58,9 @@ end
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			${node.Name} other = node as ${node.Name};
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( ${node.Name})node;
 <%
 	for field in allFields:
 		fieldName = GetPrivateName(field)
@@ -125,13 +126,18 @@ end
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			${node.Name} clone = (${node.Name})FormatterServices.GetUninitializedObject(typeof(${node.Name}));
+<%
+			if model.IsAbstract(node):
+%>
+			throw new System.InvalidOperationException("Cannot clone abstract class: ${node.Name}");
+<% else: %>		
+			${node.Name} clone = new ${node.Name}();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 <%			
 	if model.IsExpression(node):
 	
@@ -158,6 +164,10 @@ end
 	end
 
 %>			return clone;
+
+<%
+	end 
+%>
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

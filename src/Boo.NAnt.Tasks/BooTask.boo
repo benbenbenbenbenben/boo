@@ -30,6 +30,7 @@ namespace Boo.NAnt
 
 import System
 import System.IO
+import System.Linq.Enumerable
 import NAnt.Core
 import NAnt.Core.Attributes
 import NAnt.Core.Types
@@ -39,21 +40,14 @@ import Boo.Lang.Compiler.Ast
 import Boo.Lang.Compiler.Pipelines
 import Boo.Lang.Compiler.Steps
 
-class AbstractScript:
+class ScriptBase:
 	
-	_project as Project
-	_task as BooTask
+	public Project as Project
 	
-	Project:
-		get: return _project
-		set: _project = value
-		
-	Task:
-		get: return _task
-		set: _task = value
+	public Task as BooTask
 	
 	def print(msg):
-		_task.LogInfo(msg)
+		Task.LogInfo(msg)
 	
 	abstract def Run(argv as (string)):
 		pass
@@ -63,21 +57,28 @@ class PrepareScriptStep(AbstractCompilerStep):
 	override def Run():
 		module = CompileUnit.Modules[0]
 		
-		method = [|
-			override def Run(argv as (string)):
-				pass
-		|]
-					
-		method.Body = module.Globals
-		module.Globals = Block()
-		
 		script = ClassDefinition(Name: "__Script__")
-		script.BaseTypes.Add(SimpleTypeReference("Boo.NAnt.AbstractScript"))
-		script.Members.Add(method)
-		script.Members.Extend(module.Members)
+		script.BaseTypes.Add(SimpleTypeReference("Boo.NAnt.ScriptBase"))
+		script.Members.Add(RunMethodFor(module))
+		script.Members.AddRange(module.Members)
 		
 		module.Members.Clear()
-		module.Members.Add(script)		
+		module.Members.Add(script)
+		module.Globals = Block()
+		
+	def RunMethodFor(module as Module):	
+		return [|
+			override def Run(argv as (string)):
+				$(RunMethodBodyFor(module))
+		|]
+		
+	def RunMethodBodyFor(module as Module) as Statement:
+		mainMethod = module.Members["Main"] as Method 
+		if mainMethod is not null:
+			if not module.Globals.IsEmpty: raise "Either provide a Main method or global statements but not both!"
+			mainInvocation = ([| Main(argv) |] if len(mainMethod.Parameters) > 0 else [| Main() |])
+			return ExpressionStatement(mainInvocation)
+		return module.Globals
 		
 def WithWorkingDir(dir as string, block as callable()):
 	_saved = Environment.CurrentDirectory
@@ -125,7 +126,7 @@ class BooTask(AbstractBooTask):
 		print("script successfully compiled.")
 		try:
 			scriptType = result.GeneratedAssembly.GetType("__Script__", true)
-			script as AbstractScript = scriptType()
+			script as ScriptBase = scriptType()
 			script.Project = Project
 			script.Task = self
 			WithWorkingDir(Project.BaseDirectory) do:
@@ -143,20 +144,18 @@ class BooTask(AbstractBooTask):
 			return Code.Xml.InnerText
 		return XmlNode.InnerText
 			
-def ReIndent(code as string):	
-	lines = NonEmptyLines(code)
 
-	firstLine = lines[0]
-	indentation = /(\s*)/.Match(firstLine).Groups[0].Value
+def ReIndent(code as string):	
+	lines = code.Replace("\r\n", "\n").Split(char('\n'))
+	nonEmptyLines = line for line in lines if len(line.Trim())
+
+	indentation = /(\s*)/.Match(nonEmptyLines.First()).Groups[0].Value
 	return code if len(indentation) == 0
 
 	buffer = System.Text.StringBuilder()
 	for line in lines:
-		if not line.StartsWith(indentation):
-			return code // let the parser complain about it
-		buffer.AppendLine(line[len(indentation):])
+		if line.StartsWith(indentation):
+			buffer.AppendLine(line[len(indentation):])
+		else:
+			buffer.AppendLine(line)
 	return buffer.ToString()
-	
-def NonEmptyLines(s as string):
-	lines = s.Replace("\r\n", "\n").Split(char('\n'))
-	return array(line for line in lines if len(line.Trim()))

@@ -1,4 +1,4 @@
-﻿#region license
+#region license
 // Copyright (c) 2004, Rodrigo B. de Oliveira (rbo@acm.org)
 // All rights reserved.
 // 
@@ -243,7 +243,7 @@ namespace Boo.Lang.Compiler.Ast
 		/// This information is generally available and/or accurate
 		/// only for blocks and member definitions.
 		/// </summary>
-		[System.Xml.Serialization.XmlIgnore]
+		[XmlIgnore]
 		public virtual SourceLocation EndSourceLocation
 		{
 			get { return _endSourceLocation; }
@@ -265,26 +265,22 @@ namespace Boo.Lang.Compiler.Ast
 		
 		private sealed class ReplaceVisitor : DepthFirstTransformer
 		{
-			NodePredicate _predicate;
-			Node _template;	
-			int _matches;
-			
+			readonly NodePredicate _predicate;
+			readonly Node _template;
+
 			public ReplaceVisitor(NodePredicate predicate, Node template)
 			{
 				_predicate = predicate;
 				_template = template;
 			}
-			
-			public int Matches
-			{
-				get { return _matches; }
-			}
-	
+
+			public int MatchCount { get; private set; }
+
 			override protected void OnNode(Node node)
 			{
 				if (_predicate(node))
 				{
-					++_matches;
+					++MatchCount;
 					ReplaceCurrentNode(_template.CloneNode());
 				}
 				else
@@ -301,7 +297,7 @@ namespace Boo.Lang.Compiler.Ast
 		/// <returns>the number of nodes replaced</returns>
 		public int ReplaceNodes(Node pattern, Node template)
 		{
-			NodePredicate predicate = new NodePredicate(pattern.Matches);
+			var predicate = new NodePredicate(pattern.Matches);
 			return ReplaceNodes(predicate, template);
 		}
 
@@ -312,9 +308,9 @@ namespace Boo.Lang.Compiler.Ast
 		/// <returns>the number of nodes replaced</returns>
 		public int ReplaceNodes(NodePredicate predicate, Node template)
 		{
-			ReplaceVisitor visitor = new ReplaceVisitor(predicate, template);
+			var visitor = new ReplaceVisitor(predicate, template);
 			Accept(visitor);
-			return visitor.Matches;
+			return visitor.MatchCount;
 		}
 		
 		internal void InitializeParent(Node parent)
@@ -332,7 +328,7 @@ namespace Boo.Lang.Compiler.Ast
 		/// </summary>
 		public Node CleanClone()
 		{
-			Node clone = (Node)Clone();
+			var clone = (Node)Clone();
 			clone.ClearTypeSystemBindings();
 			return clone;
 		}
@@ -358,8 +354,8 @@ namespace Boo.Lang.Compiler.Ast
 		
 		public string ToCodeString()
 		{
-			System.IO.StringWriter writer = new System.IO.StringWriter();
-			new Visitors.BooPrinterVisitor(writer).Visit(this);
+			var writer = new System.IO.StringWriter();
+			Accept(new Visitors.BooPrinterVisitor(writer));
 			return writer.ToString();
 		}
 
@@ -400,10 +396,10 @@ namespace Boo.Lang.Compiler.Ast
 		///<param name="TAncestor">The type of node you request.</param>
 		public TAncestor GetAncestor<TAncestor>() where TAncestor : Node
 		{
-			Node parent = this.ParentNode;
+			var parent = ParentNode;
 			while (parent != null)
 			{
-				TAncestor ancestor = parent as TAncestor;
+				var ancestor = parent as TAncestor;
 				if (null != ancestor)
 					return ancestor;
 				parent = parent.ParentNode;
@@ -430,11 +426,11 @@ namespace Boo.Lang.Compiler.Ast
 		///<param name="TAncestor">The type of node you request.</param>
 		public IEnumerable<TAncestor> GetAncestors<TAncestor>() where TAncestor : Node
 		{
-			Node parent = this.ParentNode;
+			var parent = ParentNode;
 			while (parent != null)
 			{
-				TAncestor ancestor = parent as TAncestor;
-				if (null != ancestor)
+				var ancestor = parent as TAncestor;
+				if (ancestor != null)
 					yield return ancestor;
 				parent = parent.ParentNode;
 			}

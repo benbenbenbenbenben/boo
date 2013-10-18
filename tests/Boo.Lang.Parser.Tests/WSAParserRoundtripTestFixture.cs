@@ -11,6 +11,7 @@ namespace Boo.Lang.Parser.Tests
 			RunParserTestCase(fname);
 		}
 
+
 		[Test]
 		public void and_or_1()
 		{
@@ -63,6 +64,18 @@ namespace Boo.Lang.Parser.Tests
 		public void assignment_1()
 		{
 			RunCompilerTestCase(@"assignment-1.boo");
+		}
+		
+		[Test]
+		public void ast_literal_enum()
+		{
+			RunCompilerTestCase(@"ast-literal-enum.boo");
+		}
+		
+		[Test]
+		public void ast_literal_varargs_method()
+		{
+			RunCompilerTestCase(@"ast-literal-varargs-method.boo");
 		}
 		
 		[Test]
@@ -957,6 +970,18 @@ namespace Boo.Lang.Parser.Tests
 		public void splicing_1()
 		{
 			RunCompilerTestCase(@"splicing-1.boo");
+		}
+		
+		[Test]
+		public void splicing_class_body()
+		{
+			RunCompilerTestCase(@"splicing-class-body.boo");
+		}
+		
+		[Test]
+		public void splicing_enum_body()
+		{
+			RunCompilerTestCase(@"splicing-enum-body.boo");
 		}
 		
 		[Test]

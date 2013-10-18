@@ -2,11 +2,11 @@
 namespace BooCompiler.Tests
 {
 	using NUnit.Framework;
-	using Boo.Lang.Compiler;
 
 	[TestFixture]
 	public class CompilerErrorsTestFixture : AbstractCompilerErrorsTestFixture
 	{
+
 
 		[Test]
 		public void BCE0000_1()
@@ -96,6 +96,12 @@ namespace BooCompiler.Tests
 		public void BCE0018_3()
 		{
 			RunCompilerTestCase(@"BCE0018-3.boo");
+		}
+		
+		[Test]
+		public void BCE0018_4()
+		{
+			RunCompilerTestCase(@"BCE0018-4.boo");
 		}
 		
 		[Test]
@@ -210,12 +216,6 @@ namespace BooCompiler.Tests
 		public void BCE0022_6()
 		{
 			RunCompilerTestCase(@"BCE0022-6.boo");
-		}
-		
-		[Test]
-		public void BCE0022_7()
-		{
-			RunCompilerTestCase(@"BCE0022-7.boo");
 		}
 		
 		[Test]
@@ -645,12 +645,6 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
-		public void BCE0088_1()
-		{
-			RunCompilerTestCase(@"BCE0088-1.boo");
-		}
-		
-		[Test]
 		public void BCE0089_1()
 		{
 			RunCompilerTestCase(@"BCE0089-1.boo");
@@ -876,6 +870,12 @@ namespace BooCompiler.Tests
 		public void BCE0103_3()
 		{
 			RunCompilerTestCase(@"BCE0103-3.boo");
+		}
+		
+		[Test]
+		public void BCE0103_cannot_extend_array()
+		{
+			RunCompilerTestCase(@"BCE0103-cannot-extend-array.boo");
 		}
 		
 		[Test]
@@ -1317,6 +1317,18 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void BCE0176_1()
+		{
+			RunCompilerTestCase(@"BCE0176-1.boo");
+		}
+		
+		[Test]
+		public void cannot_convert_enum_to_single()
+		{
+			RunCompilerTestCase(@"cannot-convert-enum-to-single.boo");
+		}
+		
+		[Test]
 		public void CannotConvertFooToInt()
 		{
 			RunCompilerTestCase(@"CannotConvertFooToInt.boo");
@@ -1335,6 +1347,12 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void invalid_array_slice()
+		{
+			RunCompilerTestCase(@"invalid-array-slice.boo");
+		}
+		
+		[Test]
 		public void invalid_generic_extension_1()
 		{
 			RunCompilerTestCase(@"invalid-generic-extension-1.boo");
@@ -1347,9 +1365,33 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void invalid_matrix_index()
+		{
+			RunCompilerTestCase(@"invalid-matrix-index.boo");
+		}
+		
+		[Test]
 		public void mismatched_collection_initializers()
 		{
 			RunCompilerTestCase(@"mismatched-collection-initializers.boo");
+		}
+		
+		[Test]
+		public void selective_import_2()
+		{
+			RunCompilerTestCase(@"selective-import-2.boo");
+		}
+		
+		[Test]
+		public void selective_import()
+		{
+			RunCompilerTestCase(@"selective-import.boo");
+		}
+		
+		[Test]
+		public void single_error_on_missing_import_namespace()
+		{
+			RunCompilerTestCase(@"single-error-on-missing-import-namespace.boo");
 		}
 		
 		[Test]

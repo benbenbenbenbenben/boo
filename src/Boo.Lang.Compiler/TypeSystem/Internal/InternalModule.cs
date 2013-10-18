@@ -26,13 +26,10 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.TypeSystem.Core;
-using Boo.Lang.Compiler.TypeSystem.Services;
-using Boo.Lang.Compiler.Util;
 
 namespace Boo.Lang.Compiler.TypeSystem.Internal
 {
@@ -48,7 +45,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 
 		private INamespace _moduleAsNamespace;
 		
-		private string _namespace;
+		private readonly string _namespace;
 		
 		public InternalModule(InternalTypeSystemProvider provider, Module module)
 		{
@@ -82,7 +79,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 			get { return _namespace; }
 		}
 		
-		public Boo.Lang.Compiler.Ast.ClassDefinition ModuleClass
+		public ClassDefinition ModuleClass
 		{
 			get { return _moduleClass; }
 		}
@@ -98,7 +95,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 			}
 		}
 		
-		public void InitializeModuleClass(Boo.Lang.Compiler.Ast.ClassDefinition moduleClass)
+		public void InitializeModuleClass(ClassDefinition moduleClass)
 		{
 			_moduleClassNamespace = (INamespace) _provider.EntityFor(moduleClass);
 			_moduleClass = moduleClass;
@@ -113,10 +110,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 		
 		public INamespace ParentNamespace
 		{
-			get
-			{
-				return _provider.EntityFor((CompileUnit)_module.ParentNode).RootNamespace.ParentNamespace;
-			}
+			get { return _provider.EntityFor((CompileUnit)_module.ParentNode).RootNamespace.ParentNamespace; }
 		}
 
 		public IEnumerable<Import> Imports
@@ -138,12 +132,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 
 		private IEnumerable<INamespace> ImportedNamespaces()
 		{
-			foreach (Import import in _module.Imports)
-			{
-				IEntity entity = import.Entity;
-				if (entity != null)
-					yield return (INamespace) entity;
-			}
+			return _module.Imports.Select(i => i.Entity).OfType<INamespace>();
 		}
 
 		bool ResolveModuleMember(ICollection<IEntity> targetList, string name, EntityType flags)
@@ -176,7 +165,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 
 	internal class ModuleMembersNamespace : AbstractNamespace
 	{
-		private InternalModule _module;
+		private readonly InternalModule _module;
 
 		public ModuleMembersNamespace(InternalModule module)
 		{
@@ -187,10 +176,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 
 		public override INamespace ParentNamespace
 		{
-			get
-			{
-				return _module.ParentNamespace;
-			}
+			get { return _module.ParentNamespace; }
 		}
 
 		public override bool Resolve(ICollection<IEntity> resultingSet, string name, EntityType typesToConsider)

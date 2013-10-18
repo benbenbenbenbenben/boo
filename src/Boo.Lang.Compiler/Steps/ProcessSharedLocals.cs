@@ -28,6 +28,7 @@
 
 using System.Linq;
 using Boo.Lang.Compiler.TypeSystem.Builders;
+using Boo.Lang.Compiler.TypeSystem.Internal;
 
 namespace Boo.Lang.Compiler.Steps
 {
@@ -49,11 +50,6 @@ namespace Boo.Lang.Compiler.Steps
 		readonly List<ILocalEntity> _shared = new List<ILocalEntity>();
 		
 		int _closureDepth;
-		
-		override public void Run()
-		{
-			Visit(CompileUnit);
-		}
 		
 		override public void Dispose()
 		{

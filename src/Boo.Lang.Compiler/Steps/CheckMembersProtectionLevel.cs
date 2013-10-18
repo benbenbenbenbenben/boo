@@ -34,14 +34,9 @@ namespace Boo.Lang.Compiler.Steps
 
 	/// <summary>
 	/// </summary>
-	public class CheckMembersProtectionLevel : AbstractVisitorCompilerStep
+	public class CheckMembersProtectionLevel : AbstractFastVisitorCompilerStep
 	{
 		private IAccessibilityChecker _checker = AccessibilityChecker.Global;
-
-		override public void Run()
-		{
-			Visit(CompileUnit);
-		}
 
 		override public void OnClassDefinition(ClassDefinition node)
 		{
@@ -51,8 +46,10 @@ namespace Boo.Lang.Compiler.Steps
 			_checker = saved;
 		}
 		
-		override public void LeaveMemberReferenceExpression(MemberReferenceExpression node)
+		override public void OnMemberReferenceExpression(MemberReferenceExpression node)
 		{
+			base.OnMemberReferenceExpression(node);
+
 			OnReferenceExpression(node);
 		}
 		
@@ -63,7 +60,7 @@ namespace Boo.Lang.Compiler.Steps
 
 			if (!IsAccessible(member))
 			{
-				Error(CompilerErrorFactory.UnaccessibleMember(node, member.FullName));
+				Error(CompilerErrorFactory.UnaccessibleMember(node, member));
 				return;
 			}
 
@@ -72,9 +69,9 @@ namespace Boo.Lang.Compiler.Steps
 		    if (null == property)
                 return;
 
-		    member = AstUtil.IsLhsOfAssignment(node) ? property.GetSetMethod() : property.GetGetMethod();
+		    member = node.IsTargetOfAssignment() ? property.GetSetMethod() : property.GetGetMethod();
 		    if (!IsAccessible(member))
-		        Error(CompilerErrorFactory.UnaccessibleMember(node, member.FullName));
+		        Error(CompilerErrorFactory.UnaccessibleMember(node, member));
 		}
 
 	    private bool IsAccessible(IAccessibleMember member)

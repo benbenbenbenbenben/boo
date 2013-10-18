@@ -1,4 +1,33 @@
-﻿using System;
+﻿#region license
+// Copyright (c) 2009 Rodrigo B. de Oliveira (rbo@acm.org)
+// All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without modification,
+// are permitted provided that the following conditions are met:
+// 
+//     * Redistributions of source code must retain the above copyright notice,
+//     this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//     * Neither the name of Rodrigo B. de Oliveira nor the names of its
+//     contributors may be used to endorse or promote products derived from this
+//     software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+// THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#endregion
+
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -11,7 +40,10 @@ using Boo.Lang.Compiler.Ast.Visitors;
 using Boo.Lang.Compiler.IO;
 using Boo.Lang.Compiler.Pipelines;
 using Boo.Lang.Compiler.Resources;
+using Boo.Lang.Compiler.TypeSystem.Services;
 using Boo.Lang.Compiler.Util;
+using Boo.Lang.Environments;
+using Boo.Lang.Resources;
 
 namespace booc
 {
@@ -114,9 +146,7 @@ namespace booc
 
 					case 'v':
 						{
-							_options.EnableTraceSwitch();
 							_options.TraceLevel = TraceLevel.Warning;
-							Trace.Listeners.Add(new TextWriterTraceListener(Console.Error));
 							if (arg.Length > 2)
 							{
 								switch (arg.Substring(1))
@@ -408,12 +438,12 @@ namespace booc
 												if (_options.Defines.ContainsKey(s_v[0]))
 												{
 													_options.Defines[s_v[0]] = (s_v.Length > 1) ? s_v[1] : null;
-													Trace.WriteLine("REPLACED DEFINE '" + s_v[0] + "' WITH VALUE '" + ((s_v.Length > 1) ? s_v[1] : string.Empty) + "'");
+													TraceInfo("REPLACED DEFINE '" + s_v[0] + "' WITH VALUE '" + ((s_v.Length > 1) ? s_v[1] : string.Empty) + "'");
 												}
 												else
 												{
 													_options.Defines.Add(s_v[0], (s_v.Length > 1) ? s_v[1] : null);
-													Trace.WriteLine("ADDED DEFINE '" + s_v[0] + "' WITH VALUE '" + ((s_v.Length > 1) ? s_v[1] : string.Empty) + "'");
+													TraceInfo("ADDED DEFINE '" + s_v[0] + "' WITH VALUE '" + ((s_v.Length > 1) ? s_v[1] : string.Empty) + "'");
 												}
 											}
 										}
@@ -455,6 +485,20 @@ namespace booc
 							break;
 						}
 
+					case 'x':
+						{
+							if (arg.Substring(1).StartsWith("x-type-inference-rule-attribute"))
+							{
+								var attribute = ValueOf(arg);
+								_options.Environment = new DeferredEnvironment { { typeof(TypeInferenceRuleProvider), () => new CustomTypeInferenceRuleProvider(attribute) } };
+							}
+							else
+							{
+								InvalidOption(arg);
+							}
+							break;
+						}
+
 					default:
 						{
 							if (arg == "--help")
@@ -486,7 +530,7 @@ namespace booc
 			var paths = TrimAdditionalQuote(ValueOf(arg)); // TrimAdditionalQuote to work around nant bug with spaces on lib path
 			if (string.IsNullOrEmpty(paths))
 			{
-				Console.Error.WriteLine(Boo.Lang.ResourceManager.Format("BooC.BadLibPath", arg));
+				Console.Error.WriteLine(string.Format(Boo.Lang.Resources.StringResources.BooC_BadLibPath, arg));
 				return;
 			}
 			foreach (var dir in paths.Split(','))
@@ -494,7 +538,7 @@ namespace booc
 				if (Directory.Exists(dir))
 					_options.LibPaths.Add(dir);
 				else
-					Console.Error.WriteLine(Boo.Lang.ResourceManager.Format("BooC.BadLibPath", dir));
+					Console.Error.WriteLine(string.Format(Boo.Lang.Resources.StringResources.BooC_BadLibPath, dir));
 			}
 		}
 
@@ -573,9 +617,14 @@ namespace booc
 
 		private void ConfigurePipeline()
 		{
-			_options.Pipeline = _pipelineName != null ? CompilerPipeline.GetPipeline(_pipelineName) : new CompileToFile();
+			var pipeline = _pipelineName != null ? CompilerPipeline.GetPipeline(_pipelineName) : new CompileToFile();
+			_options.Pipeline = pipeline;
 			if (_debugSteps)
-				_options.Pipeline.AfterStep += new StepDebugger().AfterStep;
+			{
+				var stepDebugger = new StepDebugger();
+				pipeline.BeforeStep += stepDebugger.BeforeStep;
+				pipeline.AfterStep += stepDebugger.AfterStep;
+			}
 		}
 
 		private static string StripQuotes(string s)
@@ -597,11 +646,18 @@ namespace booc
 
 		private class StepDebugger
 		{
-			string _last;
+			private string _last;
+			private Stopwatch _stopWatch;
+
+			public void BeforeStep(object sender, CompilerStepEventArgs args)
+			{
+				_stopWatch = Stopwatch.StartNew();
+			}
 
 			public void AfterStep(object sender, CompilerStepEventArgs args)
 			{
-				Console.WriteLine("********* {0} *********", args.Step);
+				_stopWatch.Stop();
+				Console.WriteLine("********* {0} - {1} *********", args.Step, _stopWatch.Elapsed);
 
 				var writer = new StringWriter();
 				args.Context.CompileUnit.Accept(new BooPrinterVisitor(writer, BooPrinterVisitor.PrintOptions.PrintLocals));
@@ -618,10 +674,10 @@ namespace booc
 		{
 			file = Path.GetFullPath(file);
 			if (_processedResponseFiles.Contains(file))
-				throw new ApplicationException(FormatResource("BCE0500", file));
+				throw new ApplicationException(string.Format(Boo.Lang.Resources.StringResources.BCE0500, file));
 			_processedResponseFiles.Add(file);
 			if (!File.Exists(file))
-				throw new ApplicationException(FormatResource("BCE0501", file));
+				throw new ApplicationException(string.Format(Boo.Lang.Resources.StringResources.BCE0501, file));
 
 			var arglist = new List<string>();
 			try
@@ -648,14 +704,9 @@ namespace booc
 			}
 			catch (Exception x)
 			{
-				throw new ApplicationException(FormatResource("BCE0502", file), x);
+				throw new ApplicationException(string.Format(Boo.Lang.Resources.StringResources.BCE0502, file), x);
 			}
 			return arglist;
-		}
-
-		private string FormatResource(string id, string arg)
-		{
-			return Boo.Lang.ResourceManager.Format(id, arg);
 		}
 
 		List<string> ExpandResponseFiles(IEnumerable<string> args)
@@ -702,7 +753,7 @@ namespace booc
 
 		void InvalidOption(string arg, string message)
 		{
-			Console.Error.WriteLine(Boo.Lang.ResourceManager.Format("BooC.InvalidOption", arg, message));
+			Console.Error.WriteLine(StringResources.BooC_InvalidOption, arg, message);
 		}
 
 		static bool IsFlag(string arg)
@@ -723,9 +774,9 @@ namespace booc
 		}
 
 
-		static void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+		void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
 		{
-			Trace.WriteLine("ASSEMBLY LOADED: " + GetAssemblyLocation(args.LoadedAssembly));
+			TraceInfo("ASSEMBLY LOADED: " + GetAssemblyLocation(args.LoadedAssembly));
 		}
 
 		static string GetAssemblyLocation(Assembly a)
@@ -747,10 +798,16 @@ namespace booc
 		{
 			if (_options.TraceInfo)
 			{
-				AppDomain.CurrentDomain.AssemblyLoad += new AssemblyLoadEventHandler(OnAssemblyLoad);
+				AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
 				foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
-					Trace.WriteLine("ASSEMBLY AT STARTUP: " + GetAssemblyLocation(a));
+					TraceInfo("ASSEMBLY AT STARTUP: " + GetAssemblyLocation(a));
 			}
+		}
+
+		private void TraceInfo(string s)
+		{
+			if (_options.TraceInfo)
+				Console.Error.WriteLine(s);
 		}
 
 		static string Consume(TextReader reader)

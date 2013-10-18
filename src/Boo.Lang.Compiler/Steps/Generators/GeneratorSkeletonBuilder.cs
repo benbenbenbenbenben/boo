@@ -38,7 +38,7 @@ namespace Boo.Lang.Compiler.Steps.Generators
 	{
 		public GeneratorSkeleton SkeletonFor(InternalMethod generator)
 		{
-			Method enclosingMethod = generator.Method;
+			var enclosingMethod = generator.Method;
 			return CreateGeneratorSkeleton(enclosingMethod, enclosingMethod, GeneratorItemTypeFor(generator));
 		}
 
@@ -57,17 +57,17 @@ namespace Boo.Lang.Compiler.Steps.Generators
 		GeneratorSkeleton CreateGeneratorSkeleton(Node sourceNode, Method enclosingMethod, IType generatorItemType)
 		{
 			// create the class skeleton for type inference to work
-			BooClassBuilder builder = SetUpEnumerableClassBuilder(sourceNode, enclosingMethod, generatorItemType);
-			BooMethodBuilder getEnumeratorBuilder = SetUpGetEnumeratorMethodBuilder(sourceNode, builder, generatorItemType);
+			var builder = SetUpEnumerableClassBuilder(sourceNode, enclosingMethod, generatorItemType);
+			var getEnumeratorBuilder = SetUpGetEnumeratorMethodBuilder(sourceNode, builder, generatorItemType);
 
 			enclosingMethod.DeclaringType.Members.Add(builder.ClassDefinition);
 
-			return new GeneratorSkeleton(builder, generatorItemType, getEnumeratorBuilder);
+			return new GeneratorSkeleton(builder, getEnumeratorBuilder, generatorItemType);
 		}
 
 		private BooMethodBuilder SetUpGetEnumeratorMethodBuilder(Node sourceNode, BooClassBuilder builder, IType generatorItemType)
 		{
-			BooMethodBuilder getEnumeratorBuilder = builder.AddVirtualMethod(
+			var getEnumeratorBuilder = builder.AddVirtualMethod(
 				"GetEnumerator",
 				TypeSystemServices.IEnumeratorGenericType.GenericInfo.ConstructType(generatorItemType));
 			getEnumeratorBuilder.Method.LexicalInfo = sourceNode.LexicalInfo;
@@ -76,9 +76,12 @@ namespace Boo.Lang.Compiler.Steps.Generators
 
 		private BooClassBuilder SetUpEnumerableClassBuilder(Node sourceNode, Method enclosingMethod, IType generatorItemType)
 		{
-			BooClassBuilder builder = CodeBuilder.CreateClass(
+			var builder = CodeBuilder.CreateClass(
 				Context.GetUniqueName(enclosingMethod.Name),
 				TypeMemberModifiers.Internal | TypeMemberModifiers.Final);
+
+			if (enclosingMethod.DeclaringType.IsTransient)
+				builder.Modifiers |= TypeMemberModifiers.Transient;
 
 			builder.LexicalInfo = new LexicalInfo(sourceNode.LexicalInfo);
   			builder.AddBaseType(

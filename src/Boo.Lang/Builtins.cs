@@ -49,7 +49,7 @@ namespace Boo.Lang
 		{
 			get
 			{
-				return new System.Version("0.9.4.3504");
+				return new System.Version("0.9.7.0");
 			}
 		}
 
@@ -71,8 +71,8 @@ namespace Boo.Lang
 
 		public static string join(IEnumerable enumerable, string separator)
 		{
-			StringBuilder sb = new StringBuilder();
-			IEnumerator enumerator = enumerable.GetEnumerator();
+			var sb = new StringBuilder();
+			var enumerator = enumerable.GetEnumerator();
 			using (enumerator as IDisposable)
 			{
 				if (enumerator.MoveNext())
@@ -90,26 +90,12 @@ namespace Boo.Lang
 
 		public static string join(IEnumerable enumerable, char separator)
 		{
-			StringBuilder sb = new StringBuilder();
-			IEnumerator enumerator = enumerable.GetEnumerator();
-			using (enumerator as IDisposable)
-			{
-				if (enumerator.MoveNext())
-				{
-					sb.Append(enumerator.Current);
-					while (enumerator.MoveNext())
-					{
-						sb.Append(separator);
-						sb.Append(enumerator.Current);
-					}
-				}
-			}
-			return sb.ToString();
+		    return join(enumerable, separator.ToString());
 		}
 
 		public static string join(IEnumerable enumerable)
 		{
-			return join(enumerable, ' ');
+			return join(enumerable, " ");
 		}
 
 		public static IEnumerable map(object enumerable, ICallable function)
@@ -156,6 +142,7 @@ namespace Boo.Lang
 			return array;
 		}
 
+		[TypeInferenceRule(TypeInferenceRules.ArrayOfTypeReferencedByFirstArgument)]
 		public static Array array(Type elementType, IEnumerable enumerable)
 		{
 			if (null == elementType)
@@ -186,6 +173,7 @@ namespace Boo.Lang
 			return l.ToArray(elementType);
 		}
 
+		[TypeInferenceRule(TypeInferenceRules.ArrayOfTypeReferencedByFirstArgument)]
 		public static Array array(Type elementType, int length)
 		{
 			if (length < 0)
@@ -213,24 +201,17 @@ namespace Boo.Lang
 
 		public static T[,] matrix<T>(int length0, int length1)
 		{
-			if (length0 < 0)
-				throw new ArgumentException("`length0' cannot be negative", "length0");
-			if (length1 < 0)
-				throw new ArgumentException("`length1' cannot be negative", "length1");
-
-			return new T[length0, length1];
+			throw new NotSupportedException("Operation should have been optimized away by the compiler!");
 		}
 
 		public static T[,,] matrix<T>(int length0, int length1, int length2)
 		{
-			if (length0 < 0)
-				throw new ArgumentException("`length0' cannot be negative", "length0");
-			if (length1 < 0)
-				throw new ArgumentException("`length1' cannot be negative", "length1");
-			if (length2 < 0)
-				throw new ArgumentException("`length2' cannot be negative", "length2");
+			throw new NotSupportedException("Operation should have been optimized away by the compiler!");
+		}
 
-			return new T[length0, length1, length2];
+		public static T[,,,] matrix<T>(int length0, int length1, int length2, int length3)
+		{
+			throw new NotSupportedException("Operation should have been optimized away by the compiler!");
 		}
 		#endregion
 
@@ -240,10 +221,10 @@ namespace Boo.Lang
 			return RuntimeServices.GetEnumerable(enumerable);
 		}
 
-#if !NO_SYSTEM_DLL
+#if !NO_SYSTEM_PROCESS
 		public static System.Diagnostics.Process shellp(string filename, string arguments)
 		{
-            System.Diagnostics.Process p = new System.Diagnostics.Process();
+			var p = new System.Diagnostics.Process();
 			p.StartInfo.Arguments = arguments;
 			p.StartInfo.CreateNoWindow = true;
 			p.StartInfo.UseShellExecute = false;
@@ -257,74 +238,12 @@ namespace Boo.Lang
 
 		public static string shell(string filename, string arguments)
 		{
-            System.Diagnostics.Process p = shellp(filename, arguments);
-			string output = p.StandardOutput.ReadToEnd();
+			var p = shellp(filename, arguments);
+			var output = p.StandardOutput.ReadToEnd();
 			p.WaitForExit();
 			return output;
 		}
 #endif
-
-		internal class AssemblyExecutor : MarshalByRefObject
-		{
-			string _filename;
-			string[] _arguments;
-			string _capturedOutput = "";
-
-			public AssemblyExecutor(string filename, string[] arguments)
-			{
-				_filename = filename;
-				_arguments = arguments;
-			}
-
-			public string CapturedOutput
-			{
-				get
-				{
-					return _capturedOutput;
-				}
-			}
-
-			public void Execute()
-			{
-				StringWriter output = new System.IO.StringWriter();
-				TextWriter saved = Console.Out;
-				try
-				{
-					Console.SetOut(output);
-					//AppDomain.CurrentDomain.ExecuteAssembly(_filename, null, _arguments);
-					Assembly.LoadFrom(_filename).EntryPoint.Invoke(null, new object[1] { _arguments });
-				}
-				finally
-				{
-					Console.SetOut(saved);
-					_capturedOutput = output.ToString();
-				}
-			}
-		}
-
-		/// <summary>
-		/// Execute the specified MANAGED application in a new AppDomain.
-		///
-		/// The base directory for the new application domain will be set to
-		/// directory containing filename (Path.GetDirectoryName(Path.GetFullPath(filename))).
-		/// </summary>
-		public static string shellm(string filename, params string[] arguments)
-		{
-			AppDomainSetup setup = new AppDomainSetup();
-			setup.ApplicationBase = Path.GetDirectoryName(Path.GetFullPath(filename));
-
-			AppDomain domain = AppDomain.CreateDomain("shellm", null, setup);
-			try
-			{
-				AssemblyExecutor executor = new AssemblyExecutor(filename, arguments);
-				domain.DoCallBack(new CrossAppDomainDelegate(executor.Execute));
-				return executor.CapturedOutput;
-			}
-			finally
-			{
-				AppDomain.Unload(domain);
-			}
-		}
 
 		public static IEnumerable<object[]> enumerate(object enumerable)
 		{

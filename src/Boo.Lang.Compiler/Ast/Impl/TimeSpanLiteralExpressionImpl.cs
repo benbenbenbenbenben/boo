@@ -72,8 +72,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			TimeSpanLiteralExpression other = node as TimeSpanLiteralExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( TimeSpanLiteralExpression)node;
 			if (_value != other._value) return NoMatch("TimeSpanLiteralExpression._value");
 			return true;
 		}
@@ -91,16 +92,19 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			TimeSpanLiteralExpression clone = (TimeSpanLiteralExpression)FormatterServices.GetUninitializedObject(typeof(TimeSpanLiteralExpression));
+		
+			TimeSpanLiteralExpression clone = new TimeSpanLiteralExpression();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._expressionType = _expressionType;
 			clone._value = _value;
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

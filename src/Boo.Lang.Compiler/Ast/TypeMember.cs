@@ -156,7 +156,7 @@ namespace Boo.Lang.Compiler.Ast
 			}
 		}
 		
-		public virtual Module EnclosingModule
+		public Module EnclosingModule
 		{
 			get { return GetAncestor<Module>(); }
 		}
@@ -216,7 +216,7 @@ namespace Boo.Lang.Compiler.Ast
 			get { return IsModifierSet(TypeMemberModifiers.New); }
 		}
 
-		public bool IsStatic
+		public virtual bool IsStatic
 		{
 			get { return IsModifierSet(TypeMemberModifiers.Static); }
 		}
@@ -248,9 +248,14 @@ namespace Boo.Lang.Compiler.Ast
 		
 		public bool IsTransient
 		{
+			get { return HasTransientModifier || IsStatic; }
+		}
+
+		public bool HasTransientModifier
+		{
 			get { return IsModifierSet(TypeMemberModifiers.Transient); }
 		}
-		
+
 		public bool IsPartial
 		{
 			get { return IsModifierSet(TypeMemberModifiers.Partial); }

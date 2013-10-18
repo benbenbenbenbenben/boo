@@ -42,14 +42,12 @@ namespace Boo.Lang.Compiler.TypeSystem.Builders
 
 		public BooClassBuilder(string name)
 		{
-			if (null == name)
+			if (name == null)
 				throw new ArgumentNullException("name");
 			
 			_internalTypeSystemProvider = My<InternalTypeSystemProvider>.Instance;
 			_codeBuilder = My<BooCodeBuilder>.Instance;
-			_cd = new ClassDefinition();
-			_cd.Name = name;
-			_cd.IsSynthetic = true;
+			_cd = new ClassDefinition { Name = name, IsSynthetic = true };
 			EnsureEntityFor(_cd);
 		}
 		
@@ -72,15 +70,9 @@ namespace Boo.Lang.Compiler.TypeSystem.Builders
 		
 		public LexicalInfo LexicalInfo
 		{
-			get
-			{
-				return _cd.LexicalInfo;
-			}
+			get { return _cd.LexicalInfo; }
 			
-			set
-			{
-				_cd.LexicalInfo = value;
-			}
+			set { _cd.LexicalInfo = value; }
 		}
 		
 		public void AddAttribute(Attribute attribute)
@@ -95,12 +87,8 @@ namespace Boo.Lang.Compiler.TypeSystem.Builders
 		
 		public BooMethodBuilder AddConstructor()
 		{
-			Constructor constructor = new Constructor();
-			constructor.IsSynthetic = true;
-			constructor.Modifiers = TypeMemberModifiers.Public;
-			EnsureEntityFor(constructor);
+			var constructor = _codeBuilder.CreateConstructor(TypeMemberModifiers.Public);
 			_cd.Members.Add(constructor);
-			
 			return new BooMethodBuilder(_codeBuilder, constructor);
 		}
 
@@ -128,13 +116,8 @@ namespace Boo.Lang.Compiler.TypeSystem.Builders
 		
 		public Property AddReadOnlyProperty(string name, IType type)
 		{
-			TypeMemberModifiers modifiers = TypeMemberModifiers.Public;
-			Property property = new Property(name);
-			property.Modifiers = modifiers;
-			property.Type = _codeBuilder.CreateTypeReference(type);
-			property.Getter = _codeBuilder.CreateMethod("get_" + name, type, modifiers);
-			EnsureEntityFor(property);
-
+			var property = _codeBuilder.CreateProperty(name, type);
+			property.Getter = _codeBuilder.CreateMethod("get_" + name, type, TypeMemberModifiers.Public);
 			_cd.Members.Add(property);
 			return property;			
 		}
@@ -165,8 +148,8 @@ namespace Boo.Lang.Compiler.TypeSystem.Builders
 
 		public GenericParameterDeclaration AddGenericParameter(string name)
 		{
-			GenericParameterDeclarationCollection genericParameters = ClassDefinition.GenericParameters;
-			GenericParameterDeclaration declaration = _codeBuilder.CreateGenericParameterDeclaration(genericParameters.Count, name);
+			var genericParameters = ClassDefinition.GenericParameters;
+			var declaration = _codeBuilder.CreateGenericParameterDeclaration(genericParameters.Count, name);
 			genericParameters.Add(declaration);
 			return declaration;
 		}

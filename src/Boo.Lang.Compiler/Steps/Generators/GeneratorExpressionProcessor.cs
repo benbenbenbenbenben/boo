@@ -31,7 +31,9 @@ using System.Collections;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.TypeSystem;
 using Boo.Lang.Compiler.TypeSystem.Builders;
+using Boo.Lang.Compiler.TypeSystem.Internal;
 using Boo.Lang.Compiler.TypeSystem.Services;
+using Boo.Lang.Compiler.Util;
 using Boo.Lang.Environments;
 using Boo.Lang.Runtime;
 

@@ -127,6 +127,12 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void field_splicing_in_expression_becomes_reference_to_field()
+		{
+			RunCompilerTestCase(@"field-splicing-in-expression-becomes-reference-to-field.boo");
+		}
+		
+		[Test]
 		public void field_splicing_null_initializer()
 		{
 			RunCompilerTestCase(@"field-splicing-null-initializer.boo");
@@ -154,6 +160,24 @@ namespace BooCompiler.Tests
 		public void lexical_info_is_preserved()
 		{
 			RunCompilerTestCase(@"lexical-info-is-preserved.boo");
+		}
+		
+		[Test]
+		public void macro_yielding_selective_import()
+		{
+			RunCompilerTestCase(@"macro-yielding-selective-import.boo");
+		}
+		
+		[Test]
+		public void macro_yielding_types_shouldnt_cause_module_class_to_be_defined()
+		{
+			RunCompilerTestCase(@"macro-yielding-types-shouldnt-cause-module-class-to-be-defined.boo");
+		}
+		
+		[Test]
+		public void macro_yielding_varargs()
+		{
+			RunCompilerTestCase(@"macro-yielding-varargs.boo");
 		}
 		
 		[Test]
@@ -370,6 +394,12 @@ namespace BooCompiler.Tests
 		public void splicing_9()
 		{
 			RunCompilerTestCase(@"splicing-9.boo");
+		}
+		
+		[Test]
+		public void splicing_reference_into_enum_body()
+		{
+			RunCompilerTestCase(@"splicing-reference-into-enum-body.boo");
 		}
 		
 		[Test]

@@ -48,41 +48,41 @@ namespace Boo.Lang.Compiler.Ast
 		
 		override public string FullName
 		{
-			get
-			{
-				if (HasGenericParameters)
-				{
-					return string.Format(
-						"{0}[of {1}]", 
-						QualifiedName, 
-						GenericParameters.ToCodeString());
-				}
-				return QualifiedName;
-			}
+			get { return QualifiedName; }
 		}
 
 		public string QualifiedName
 		{
 			get
 			{
-				StringBuilder qualifiedName = new StringBuilder();
-
-				TypeDefinition parentType = ParentNode as TypeDefinition;
-
-				if (ParentNode != null && ParentNode.NodeType == NodeType.Module)
+				var qualifiedName = new StringBuilder();
+				if (ParentNode != null)
 				{
-					if (EnclosingNamespace != null)
+					if (ParentNode.NodeType == NodeType.Module)
 					{
-						qualifiedName.Append(EnclosingNamespace.Name).Append(".");
+						if (EnclosingNamespace != null)
+							qualifiedName.Append(EnclosingNamespace.Name).Append(".");
+					}
+					else
+					{
+						var parentType = ParentNode as TypeDefinition;
+						if (parentType != null)
+							qualifiedName.Append(parentType.QualifiedName).Append(".");
 					}
 				}
-				else if (parentType != null)
-				{
-					qualifiedName.Append(parentType.FullName).Append(".");
-				}
-
 				qualifiedName.Append(Name);
 				return qualifiedName.ToString();
+			}
+		}
+
+		public bool IsNested
+		{
+			get
+			{
+				var declaringType = DeclaringType;
+				if (declaringType == null || declaringType.NodeType == NodeType.Module)
+					return false;
+				return true;
 			}
 		}
 		
@@ -99,9 +99,7 @@ namespace Boo.Lang.Compiler.Ast
 		public bool HasMemberOfType(NodeType memberType)
 		{
 			foreach (TypeMember member in _members)
-			{
 				if (memberType == member.NodeType) return true;
-			}
 			return false;
 		}
 
@@ -134,6 +132,24 @@ namespace Boo.Lang.Compiler.Ast
 		public Constructor GetStaticConstructor()
 		{
 			return GetConstructor(0, true, null);
+		}
+
+		public void Merge(TypeDefinition node)
+		{
+			if (null == node) throw new ArgumentNullException("node");
+			if (NodeType != node.NodeType) throw new ArgumentException(string.Format("Cannot merge {0} into a {1}.", node.NodeType, NodeType));
+			if (ReferenceEquals(this, node)) return;
+			Attributes.AddRange(node.Attributes);
+			AddNonMatchingBaseTypes(node);
+			Members.AddRange(node.Members);
+		}
+
+		private void AddNonMatchingBaseTypes(TypeDefinition node)
+		{
+			var baseTypes = BaseTypes;
+			foreach (var baseType in node.BaseTypes)
+				if (!baseTypes.Contains(baseType.Matches))
+					baseTypes.Add(baseType);
 		}
 
 		protected Constructor GetConstructor(int index, bool? isStatic, bool? isSynthetic)

@@ -72,8 +72,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			UnlessStatement other = node as UnlessStatement;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( UnlessStatement)node;
 			if (!Node.Matches(_modifier, other._modifier)) return NoMatch("UnlessStatement._modifier");
 			if (!Node.Matches(_condition, other._condition)) return NoMatch("UnlessStatement._condition");
 			if (!Node.Matches(_block, other._block)) return NoMatch("UnlessStatement._block");
@@ -108,13 +109,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			UnlessStatement clone = (UnlessStatement)FormatterServices.GetUninitializedObject(typeof(UnlessStatement));
+		
+			UnlessStatement clone = new UnlessStatement();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			if (null != _modifier)
 			{
 				clone._modifier = _modifier.Clone() as StatementModifier;
@@ -131,6 +133,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._block.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

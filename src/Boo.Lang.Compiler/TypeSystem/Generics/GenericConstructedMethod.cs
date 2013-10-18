@@ -27,6 +27,7 @@
 #endregion
 
 using System;
+using Boo.Lang.Compiler.TypeSystem.Internal;
 using Boo.Lang.Environments;
 
 namespace Boo.Lang.Compiler.TypeSystem.Generics
@@ -46,8 +47,8 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 		
 		GenericMapping _genericMapping;		
 		bool _fullyConstructed;
-		string _fullName = null;
-		IParameter[] _parameters = null;		
+		string _fullName;
+		IParameter[] _parameters;		
 		
 		public GenericConstructedMethod(IMethod definition, IType[] arguments)
 		{
@@ -142,16 +143,6 @@ namespace Boo.Lang.Compiler.TypeSystem.Generics
 		public bool IsExtension 
 		{ 
 			get { return _definition.IsExtension; } 
-		}
-
-		public bool IsBooExtension
-		{
-			get { return _definition.IsBooExtension; }
-		}
-
-		public bool IsClrExtension
-		{
-			get { return _definition.IsClrExtension; }
 		}
 
 		public bool IsProtected

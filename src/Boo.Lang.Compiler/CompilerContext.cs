@@ -28,6 +28,7 @@
 
 using System;
 using System.Diagnostics;
+using System.IO;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.Services;
 using Boo.Lang.Compiler.TypeSystem.Reflection;
@@ -37,9 +38,6 @@ using Boo.Lang.Environments;
 
 namespace Boo.Lang.Compiler
 {
-	/// <summary>
-	/// boo compilation context.
-	/// </summary>
 	public class CompilerContext
 	{
 		public static CompilerContext Current
@@ -47,23 +45,21 @@ namespace Boo.Lang.Compiler
 			get { return ActiveEnvironment.Instance != null ? My<CompilerContext>.Instance : null; }
 		}
 
-		protected CompilerParameters _parameters;
+		private readonly CompilerParameters _parameters;
 
-		protected CompileUnit _unit;
+		private readonly CompileUnit _unit;
 
-		protected CompilerReferenceCollection _references;
+		private readonly CompilerReferenceCollection _references;
 
-		protected CompilerErrorCollection _errors;
-		
-		protected CompilerWarningCollection _warnings;
-		
-		protected TraceSwitch _traceSwitch;
+		private readonly CompilerErrorCollection _errors;
 
-		protected Assembly _generatedAssembly;
-		
-		protected string _generatedAssemblyFileName;
-		
-		protected Hash _properties;
+		private readonly CompilerWarningCollection _warnings;
+
+		private Assembly _generatedAssembly;
+
+		private string _generatedAssemblyFileName;
+
+		private readonly Hash _properties;
 		
 		public CompilerContext() : this(new CompileUnit())
 		{
@@ -132,7 +128,7 @@ namespace Boo.Lang.Compiler
 			set
 			{
 				if (string.IsNullOrEmpty(value))
-					throw new ArgumentNullException("GeneratedAssemblyFileName");
+					throw new ArgumentNullException("value");
 				_generatedAssemblyFileName = value;
 			}
 		}
@@ -169,10 +165,12 @@ namespace Boo.Lang.Compiler
 			get { return _unit; }
 		}
 
-		public TypeSystem.BooCodeBuilder CodeBuilder
+		public BooCodeBuilder CodeBuilder
 		{
-			get { return My<BooCodeBuilder>.Instance; }
+			get { return _codeBuilder; }
 		}
+
+		private EnvironmentProvision<BooCodeBuilder> _codeBuilder = new EnvironmentProvision<BooCodeBuilder>();
 		
 		public Assembly GeneratedAssembly
 		{
@@ -190,8 +188,8 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceInfo)
 			{
-				Trace.WriteLine(string.Format(format, args));
-				++Trace.IndentLevel;
+				TraceLine(format, args);
+				IndentTraceOutput();
 			}
 		}
 		
@@ -200,8 +198,8 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceInfo)
 			{
-				--Trace.IndentLevel;
-				Trace.WriteLine(string.Format(format, args));
+				DedentTraceOutput();
+				TraceLine(format, args);
 			}
 		}
 		
@@ -210,7 +208,7 @@ namespace Boo.Lang.Compiler
 		{			
 			if (_parameters.TraceInfo)
 			{
-				Trace.WriteLine(string.Format(format, args));
+				TraceLine(format, args);
 			}			
 		}
 		
@@ -219,7 +217,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceInfo)
 			{
-				Trace.WriteLine(message);
+				TraceLine(message);
 			}
 		}
 		
@@ -228,7 +226,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceWarning)
 			{
-				Trace.WriteLine(message);
+				TraceLine(message);
 			}
 		}
 
@@ -237,7 +235,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceWarning)
 			{
-				Trace.WriteLine(string.Format(message, args));
+				TraceLine(message, args);
 			}
 		}
 		
@@ -246,7 +244,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceVerbose)
 			{
-				Trace.WriteLine(string.Format(format, args));
+				TraceLine(format, args);
 			}			
 		}
 		
@@ -255,7 +253,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceVerbose)
 			{
-				Trace.WriteLine(string.Format(format, param1, param2));
+				TraceLine(format, param1, param2);
 			}
 		}
 		
@@ -264,7 +262,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceVerbose)
 			{
-				Trace.WriteLine(string.Format(format, param1, param2, param3));
+				TraceLine(format, param1, param2, param3);
 			}
 		}
 		
@@ -273,7 +271,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceVerbose)
 			{
-				Trace.WriteLine(string.Format(format, param));
+				TraceLine(format, param);
 			}
 		}
 		
@@ -282,7 +280,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceVerbose)
 			{
-				Trace.WriteLine(message);
+				TraceLine(message);
 			}
 		}	
 		
@@ -291,7 +289,7 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceError)
 			{
-				Trace.WriteLine(string.Format(message, args));
+				TraceLine(message, args);
 			}
 		}
 		
@@ -300,16 +298,50 @@ namespace Boo.Lang.Compiler
 		{
 			if (_parameters.TraceError)
 			{
-				Trace.WriteLine(x);
+				TraceLine(x);
 			}
+		}
+
+		private void IndentTraceOutput()
+		{
+			_indentation++;
+		}
+
+		private void DedentTraceOutput()
+		{
+			_indentation--;
+		}
+
+		private int _indentation;
+
+		private void TraceLine(object o)
+		{
+			WriteIndentation();
+			TraceWriter.WriteLine(o);
+		}
+
+		private void WriteIndentation()
+		{
+			for (var i=0; i<_indentation; ++i) TraceWriter.Write('\t');
+		}
+
+		private TextWriter TraceWriter
+		{
+			get { return Console.Out; }
+		}
+
+		private void TraceLine(string format, params object[] args)
+		{
+			WriteIndentation();
+			TraceWriter.WriteLine(format, args);
 		}
 
 		private readonly CachingEnvironment _environment;
 
 		///<summary>Registers a (new) compiler service.</summary>
-		///<param name="T">The Type of the service to register. It must be a reference type.</param>
+		///<typeparam name="T">The Type of the service to register. It must be a reference type.</typeparam>
 		///<param name="service">An instance of the service.</param>
-		///<exception cref="ArgumentException">Thrown when <paramref name="T"/> is already registered.</exception>
+		///<exception cref="ArgumentException">Thrown when <typeparamref name="T"/> is already registered.</exception>
 		///<exception cref="ArgumentNullException">Thrown when <paramref name="service"/> is null.</exception>
 		///<remarks>Services are unregistered (and potentially disposed) when a pipeline has been ran.</remarks>
 		public void RegisterService<T>(T service) where T : class
@@ -327,8 +359,10 @@ namespace Boo.Lang.Compiler
 
 		private void InitializeService(object service)
 		{
+			TraceInfo("Compiler component '{0}' instantiated.", service);
+
 			var component = service as ICompilerComponent;
-			if (null == component)
+			if (component == null)
 				return;
 			component.Initialize(this);
 		}

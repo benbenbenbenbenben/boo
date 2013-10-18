@@ -29,11 +29,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Reflection;
 using System.Collections;
 using System.IO;
 using System.Text;
+using Boo.Lang.Resources;
 using Boo.Lang.Runtime.DynamicDispatching;
 
 namespace Boo.Lang.Runtime
@@ -93,8 +93,9 @@ namespace Boo.Lang.Runtime
 		}
 
 		public static object Invoke(object target, string name, object[] args)
-		{	
-			return Dispatch(target, name, args, () => CreateMethodDispatcher(target, name, args));
+		{
+			var dispatcher = GetDispatcher(target, args, name, () => CreateMethodDispatcher(target, name, args));
+			return dispatcher(target, args);
 		}
 
 		private static Dispatcher CreateMethodDispatcher(object target, string name, object[] args)
@@ -127,23 +128,23 @@ namespace Boo.Lang.Runtime
 			return new MethodDispatcherFactory(_extensions, target, targetType, name, args).Create();
 		}
 
-		private static object Dispatch(object target, string cacheKeyName, object[] args, DispatcherCache.DispatcherFactory factory)
+		private static Dispatcher GetDispatcher(object target, object[] args, string cacheKeyName, DispatcherCache.DispatcherFactory factory)
 		{
 			var cacheKeyTypes = MethodResolver.GetArgumentTypes(args);
-			return Dispatch(target, cacheKeyName, cacheKeyTypes, args, factory);
+			return GetDispatcher(target, cacheKeyName, cacheKeyTypes, factory);
 		}
 
-		private static object Dispatch(object target, string cacheKeyName, Type[] cacheKeyTypes, object[] args, DispatcherCache.DispatcherFactory factory)
+		private static Dispatcher GetDispatcher(object target, string cacheKeyName, Type[] cacheKeyTypes, DispatcherCache.DispatcherFactory factory)
 		{
 			var targetType = (target as Type) ?? target.GetType();
 			var key = new DispatcherKey(targetType, cacheKeyName, cacheKeyTypes);
-			var dispatcher = _cache.Get(key, factory);
-			return dispatcher(target, args);
+			return _cache.Get(key, factory);
 		}
 
 		public static object GetProperty(object target, string name)
 		{
-			return Dispatch(target, name, NoArguments, () => CreatePropGetDispatcher(target, name));
+			var dispatcher = GetDispatcher(target, NoArguments, name, () => CreatePropGetDispatcher(target, name));
+			return dispatcher(target, NoArguments);
 		}
 
 		private static Dispatcher CreatePropGetDispatcher(object target, string name)
@@ -170,7 +171,9 @@ namespace Boo.Lang.Runtime
 
 		public static object SetProperty(object target, string name, object value)
 		{
-			return Dispatch(target, name, new[] { value }, () => CreatePropSetDispatcher(target, name, value));
+			object[] args = new[] { value };
+			var dispatcher = GetDispatcher(target, args, name, () => CreatePropSetDispatcher(target, name, value));
+			return dispatcher(target, args);
 		}
 
 		private static Dispatcher CreatePropSetDispatcher(object target, string name, object value)
@@ -203,9 +206,9 @@ namespace Boo.Lang.Runtime
 
 			public ValueTypeChange(object target, string member, object value)
 			{
-				this.Target = target;
-				this.Member = member;
-				this.Value = value;
+				Target = target;
+				Member = member;
+				Value = value;
 			}
 		}
 
@@ -218,7 +221,7 @@ namespace Boo.Lang.Runtime
 				{
 					SetProperty(change.Target, change.Member, change.Value);
 				}
-				catch (System.MissingFieldException)
+				catch (MissingFieldException)
 				{
 					// hit a readonly property
 					break;
@@ -230,7 +233,9 @@ namespace Boo.Lang.Runtime
 		{
 			if (value == null) return null;
 
-			return Dispatch(value, "$Coerce$", new[] {toType}, new object[] {toType}, () => CreateCoerceDispatcher(value, toType));
+			var args = new object[] {toType};
+			var dispatcher = GetDispatcher(value, "$Coerce$", new[] {toType}, () => CreateCoerceDispatcher(value, toType));
+			return dispatcher(value, args);
 		}
 
 		private static Dispatcher CreateCoerceDispatcher(object value, Type toType)
@@ -279,7 +284,8 @@ namespace Boo.Lang.Runtime
 
 		public static object GetSlice(object target, string name, object[] args)
 		{
-			return Dispatch(target, name + "[]", args, () => CreateGetSliceDispatcher(target, name, args));
+			var dispatcher = GetDispatcher(target, args, name + "[]", () => CreateGetSliceDispatcher(target, name, args));
+			return dispatcher(target, args);
 		}
 
 		private static Dispatcher CreateGetSliceDispatcher(object target, string name, object[] args)
@@ -290,7 +296,7 @@ namespace Boo.Lang.Runtime
 
 			if ("" == name
 				&& args.Length == 1
-				&& target is System.Array) return GetArraySlice;
+				&& target is Array) return GetArraySlice;
 			
 			return new SliceDispatcherFactory(_extensions, target, target.GetType(), name, args).CreateGetter();
 		}
@@ -303,7 +309,8 @@ namespace Boo.Lang.Runtime
 
 		public static object SetSlice(object target, string name, object[] args)
 		{
-			return Dispatch(target, name + "[]=", args, () => CreateSetSliceDispatcher(target, name, args));
+			var dispatcher = GetDispatcher(target, args, name + "[]=", () => CreateSetSliceDispatcher(target, name, args));
+			return dispatcher(target, args);
 		}
 
 		static Dispatcher CreateSetSliceDispatcher(object target, string name, object[] args)
@@ -311,15 +318,14 @@ namespace Boo.Lang.Runtime
 			var duck = target as IQuackFu;
 			if (null != duck)
 			{
-				return delegate(object o, object[] arguments)
-				{
-					return ((IQuackFu) o).QuackSet(name, (object[]) GetRange2(arguments, 0, arguments.Length - 1), arguments[arguments.Length - 1]);
-				};
+				return
+					(o, arguments) =>
+					((IQuackFu) o).QuackSet(name, (object[]) GetRange2(arguments, 0, arguments.Length - 1), arguments[arguments.Length - 1]);
 			}
 
 			if ("" == name
 				&& 2 == args.Length
-				&& target is System.Array) return SetArraySlice;
+				&& target is Array) return SetArraySlice;
 
 			return new SliceDispatcherFactory(_extensions, target, target.GetType(), name, args).CreateSetter();
 		}
@@ -505,12 +511,10 @@ namespace Boo.Lang.Runtime
 			}
 			else
 			{
-				object[] args = new object[] { operand };
-				IQuackFu duck = operand as IQuackFu;
-				if (null != duck)
-				{
+				var args = new[] { operand };
+				var duck = operand as IQuackFu;
+				if (duck != null)
 					return duck.QuackInvoke(operatorName, args);
-				}
 
 				try
 				{
@@ -538,20 +542,22 @@ namespace Boo.Lang.Runtime
 
 		public static object MoveNext(IEnumerator enumerator)
 		{
-			if (null == enumerator) Error("CantUnpackNull");
-			if (!enumerator.MoveNext()) Error("UnpackListOfWrongSize");
+			if (enumerator == null)
+				throw new ApplicationException(StringResources.CantUnpackNull);
+			if (!enumerator.MoveNext())
+				throw new ApplicationException(StringResources.UnpackListOfWrongSize);
 			return enumerator.Current;
 		}
 
 		public static int Len(object obj)
 		{
-			if (null != obj)
+			if (obj != null)
 			{
 				var collection = obj as ICollection;
-				if (null != collection) return collection.Count;
+				if (collection != null) return collection.Count;
 
 				var s = obj as string;
-				if (null != s) return s.Length;
+				if (s != null) return s.Length;
 			}
 			throw new ArgumentException();
 		}
@@ -579,122 +585,135 @@ namespace Boo.Lang.Runtime
 			return target;
 		}
 
-		public static void SetMultiDimensionalRange1(Array source, Array dest, int[] ranges, bool[] collapse)
+		public static void SetMultiDimensionalRange1(Array source, Array dest, int[] ranges, bool[] compute_end, bool[] collapse)
 		{
-			if (dest.Rank != ranges.Length / 2)
-			{
-				throw new Exception("invalid range passed: " + ranges.Length / 2 + ", expected " + dest.Rank * 2);
-			}
+			if (dest.Rank != ranges.Length/2)
+				throw new Exception("invalid range passed: " + ranges.Length/2 + ", expected " + dest.Rank*2);
 
-			for (int i = 0; i < dest.Rank; i++)
+			for (var i = 0; i < dest.Rank; i++)
 			{
-				if (ranges[2 * i] > 0 ||
-					ranges[2 * i] > dest.GetLength(i) ||
+				if (compute_end[i])
+					ranges[2 * i + 1] = dest.GetLength(i);
+
+				if (ranges[2 * i] < 0 ||
+					ranges[2 * i] >= dest.GetLength(i) ||
 					ranges[2 * i + 1] > dest.GetLength(i) ||
-					ranges[2 * i + 1] < ranges[2 * i])
+					ranges[2 * i + 1] <= ranges[2 * i])
 				{
 					// FIXME: Better error reporting
-					Error("InvalidArray");
+					throw new ApplicationException("Invalid array.");
 				}
 			}
 
-			int sourceRank = 0;
-			foreach (bool val in collapse)
+			var destSubsetRank = 0;
+			foreach (var val in collapse)
 			{
 				if (!val)
-				{
-					sourceRank++;
-				}
+					destSubsetRank++;
 			}
 
-			if (source.Rank != sourceRank)
+			if (destSubsetRank == 0)
+				destSubsetRank = 1;
+
+			if (source.Rank != destSubsetRank)
 			{
-				// FIXME: Better error reporting
-				Error("InvalidArray");
+				throw new ApplicationException(String.Format("Cannot assign array of rank {0} into an array subset of rank {1}.",source.Rank,destSubsetRank));
 			}
-
+			
 			int[] lensDest = new int[dest.Rank];
-			int[] lensSrc = new int[sourceRank];
+			int[] lensDestSubset = new int[destSubsetRank];
+			int[] lensSrc = new int[source.Rank];
 			int rankIndex = 0;
+			bool length_mismatch = false;
 			for (int i = 0; i < dest.Rank; i++)
 			{
 				lensDest[i] = ranges[2 * i + 1] - ranges[2 * i];
 				if (!collapse[i])
 				{
-					lensSrc[rankIndex] = lensDest[i] - ranges[2 * i];
-					if (lensSrc[rankIndex] != source.GetLength(rankIndex))
+					lensDestSubset[rankIndex] = lensDest[i];
+					lensSrc[rankIndex] = source.GetLength(rankIndex);
+					if (lensSrc[rankIndex] != lensDest[i])
 					{
-						// FIXME: Better error reporting
-						Error("InvalidArray");
+						length_mismatch = true;
 					}
 					rankIndex++;
 				}
 			}
-
-			int[] modInd = new int[dest.Rank];
-			for (int i = 0; i < dest.Rank; i++)
+			
+			if (length_mismatch)
 			{
-				if (i == 0)
+				StringBuilder source_dims = new StringBuilder(lensSrc[0]);
+				StringBuilder dest_subset_dims = new StringBuilder(lensDestSubset[0]);
+				for (int i = 1; i < source.Rank; i++)
 				{
-					modInd[i] = source.Length / lensDest[lensDest.Length - 1];
+					source_dims.Append(" x ");
+					source_dims.Append(lensSrc[i]);
+					
+					dest_subset_dims.Append(" x ");
+					dest_subset_dims.Append(lensDestSubset[i]);
 				}
-				else
-				{
-					modInd[i] = modInd[i - 1] / lensDest[i - 1];
-				}
+				throw new ApplicationException(String.Format("Cannot assign array with dimensions {0} into array subset of dimensions {1}.",source_dims.ToString(),dest_subset_dims.ToString()));
 			}
 
-			int counter;
+			int[] prodInd = new int[source.Rank];
+			prodInd[0] = lensSrc[0];
+			for (int i = 1; i < source.Rank; i++)
+				prodInd[i] = prodInd[i - 1]*lensSrc[i];
+
 			int[] indexDest = new int[dest.Rank];
-			int[] indexSrc = new int[sourceRank];
+			int[] indexSrc = new int[source.Rank];
 			for (int i = 0; i < source.Length; i++)
 			{
-				counter = 0;
+				int counter = 0;
 				for (int j = 0; j < dest.Rank; j++)
 				{
-					int index = (i % modInd[j]) / (modInd[j] / lensDest[j]);
-					indexDest[j] = index;
-					if (!collapse[j])
+					if (collapse[j])
+						indexDest[j] = ranges[2*j];
+					else
 					{
-						indexSrc[counter] = indexDest[j] + ranges[2 * j];
+						indexSrc[counter] = i%prodInd[counter];
+						indexDest[j] = indexSrc[counter] + ranges[2*j];
 						counter++;
 					}
-					dest.SetValue(source.GetValue(indexSrc), indexDest);
 				}
+				dest.SetValue(source.GetValue(indexSrc), indexDest);
 			}
 		}
 
-		public static Array GetMultiDimensionalRange1(Array source, int[] ranges, bool[] collapse)
+		public static Array GetMultiDimensionalRange1(Array source, int[] ranges, bool[] compute_end, bool[] collapse)
 		{
 			int rankSrc = source.Rank;
-			int collapseSize = 0;
-
-			foreach (bool val in collapse)
-			{
-				if (val)
-				{
-					collapseSize++;
-				}
-			}
-
-			int rankDest = rankSrc - collapseSize;
-			int[] lensDest = new int[rankDest];
 			int[] lensSrc = new int[rankSrc];
-
-			int rankIndex = 0;
+			int collapseSize = 0;	
 			for (int i = 0; i < rankSrc; i++)
 			{
 				ranges[2 * i] = NormalizeIndex(source.GetLength(i), ranges[2 * i]);
-				ranges[2 * i + 1] = NormalizeIndex(source.GetLength(i), ranges[2 * i + 1]);
+				if (compute_end[i]) 
+					ranges[2*i + 1] = source.GetLength(i);	
+				else 
+					ranges[2 * i + 1] = NormalizeIndex(source.GetLength(i), ranges[2 * i + 1]);					
 
 				lensSrc[i] = ranges[2 * i + 1] - ranges[2 * i];
+				collapseSize += collapse[i] ? 1 : 0;
+			}
+			
+			int rankDest = rankSrc - collapseSize;
+			int[] lensDest = new int[rankDest];
+			int rankIndex = 0;
+			for (int i = 0; i < rankSrc; i++)
+			{
 				if (!collapse[i])
 				{
-					lensDest[rankIndex] = ranges[2 * i + 1] - ranges[2 * i];
+					lensDest[rankIndex] = lensSrc[i];
 					rankIndex++;
 				}
 			}
-
+			if (rankDest == 0)
+			{
+				rankDest = 1;
+				lensDest = new int[1];
+				lensDest[0] = 1;
+			}
 			Array dest = Array.CreateInstance(source.GetType().GetElementType(), lensDest);
 
 			int[] modInd = new int[rankSrc];
@@ -704,13 +723,9 @@ namespace Boo.Lang.Runtime
 			for (int i = 0; i < rankSrc; i++)
 			{
 				if (i == 0)
-				{
 					modInd[i] = dest.Length;
-				}
 				else
-				{
-					modInd[i] = modInd[i - 1] / lensSrc[i - 1];
-				}
+					modInd[i] = modInd[i - 1]/lensSrc[i - 1];
 			}
 
 			for (int i = 0; i < dest.Length; i++)
@@ -736,11 +751,11 @@ namespace Boo.Lang.Runtime
 		{
 			if (null == array)
 			{
-				Error("CantUnpackNull");
+				throw new ApplicationException(StringResources.CantUnpackNull);
 			}
 			if (expected > array.Length)
 			{
-				Error("UnpackArrayOfWrongSize", expected, array.Length);
+				Error(StringResources.UnpackArrayOfWrongSize, expected, array.Length);
 			}
 		}
 
@@ -752,37 +767,31 @@ namespace Boo.Lang.Runtime
 		 */
 		public static int NormalizeIndex(int len, int index)
 		{
-			if (index < 0)
-				return Math.Max(0, index + len);
-			return Math.Min(index, len);
+			return index < 0 ? Math.Max(0, index + len) : Math.Min(index, len);
 		}
 
 		public static int NormalizeArrayIndex(Array array, int index)
 		{
-			if (index < 0)
-				return Math.Max(0, index + array.Length);
-			return Math.Min(index, array.Length);
+			return index < 0 ? Math.Max(0, index + array.Length) : Math.Min(index, array.Length);
 		}
 
 		public static int NormalizeStringIndex(string s, int index)
 		{
-			if (index < 0)
-				return Math.Max(0, index + s.Length);
-			return Math.Min(index, s.Length);
+			return index < 0 ? Math.Max(0, index + s.Length) : Math.Min(index, s.Length);
 		}
 
 		public static IEnumerable GetEnumerable(object enumerable)
 		{
-			if (null == enumerable) Error("CantEnumerateNull");
+			if (null == enumerable)
+				throw new ApplicationException(StringResources.CantEnumerateNull);
 
-			IEnumerable iterator = enumerable as IEnumerable;
+			var iterator = enumerable as IEnumerable;
 			if (null != iterator) return iterator;
 
-			TextReader reader = enumerable as TextReader;
+			var reader = enumerable as TextReader;
 			if (null != reader) return TextReaderEnumerator.lines(reader);
 
-			Error("ArgumentNotEnumerable");
-			return null;
+			throw new ApplicationException(StringResources.ArgumentNotEnumerable);
 		}
 
 		#region global operators
@@ -873,13 +882,17 @@ namespace Boo.Lang.Runtime
 		public static bool op_Member(string lhs, string rhs)
 		{
 			if (null == lhs || null == rhs)
-			{
 				return false;
-			}
+			return rhs.IndexOf(lhs) > -1;
+		}
+		
+		public static bool op_Member(char lhs, string rhs)
+		{
+			if (rhs == null) return false;
 			return rhs.IndexOf(lhs) > -1;
 		}
 
-#if !NO_SYSTEM_DLL
+#if !NO_REGEX
 		public static bool op_Match(string input, System.Text.RegularExpressions.Regex pattern)
 		{
 			return pattern.IsMatch(input);
@@ -903,7 +916,7 @@ namespace Boo.Lang.Runtime
 
 		public static string op_Modulus(string lhs, IEnumerable rhs)
 		{
-			return string.Format(lhs, Boo.Lang.Builtins.array(rhs));
+			return string.Format(lhs, Builtins.array(rhs));
 		}
 
 		public static string op_Modulus(string lhs, object[] rhs)
@@ -1132,7 +1145,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) * rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) * rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) * rhsConvertible.ToInt32(null);
 			}
@@ -1158,7 +1170,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) / rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) / rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) / rhsConvertible.ToInt32(null);
 			}
@@ -1184,7 +1195,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) + rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) + rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) + rhsConvertible.ToInt32(null);
 			}
@@ -1210,7 +1220,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) - rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) - rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) - rhsConvertible.ToInt32(null);
 			}
@@ -1236,7 +1245,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) == rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) == rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) == rhsConvertible.ToInt32(null);
 			}
@@ -1262,7 +1270,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) > rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) > rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) > rhsConvertible.ToInt32(null);
 			}
@@ -1288,7 +1295,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) >= rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) >= rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) >= rhsConvertible.ToInt32(null);
 			}
@@ -1314,7 +1320,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) < rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) < rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) < rhsConvertible.ToInt32(null);
 			}
@@ -1340,7 +1345,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) <= rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) <= rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) <= rhsConvertible.ToInt32(null);
 			}
@@ -1366,14 +1370,12 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) % rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) % rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) % rhsConvertible.ToInt32(null);
 			}
 		}
 
-		private static double op_Exponentiation(object lhs, TypeCode lhsTypeCode,
-										  object rhs, TypeCode rhsTypeCode)
+		private static double op_Exponentiation(object lhs, TypeCode lhsTypeCode, object rhs, TypeCode rhsTypeCode)
 		{
 			IConvertible lhsConvertible = (IConvertible)lhs;
 			IConvertible rhsConvertible = (IConvertible)rhs;
@@ -1399,7 +1401,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) & rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) & rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) & rhsConvertible.ToInt32(null);
 			}
@@ -1423,7 +1424,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) | rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) | rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) | rhsConvertible.ToInt32(null);
 			}
@@ -1447,7 +1447,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) ^ rhsConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) ^ rhsConvertible.ToUInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) ^ rhsConvertible.ToInt32(null);
 			}
@@ -1481,7 +1480,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) << rhsConvertible.ToInt32(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) << rhsConvertible.ToInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) << rhsConvertible.ToInt32(null);
 			}
@@ -1515,7 +1513,6 @@ namespace Boo.Lang.Runtime
 					return lhsConvertible.ToInt64(null) >> rhsConvertible.ToInt32(null);
 				case TypeCode.UInt32:
 					return lhsConvertible.ToUInt32(null) >> rhsConvertible.ToInt32(null);
-				case TypeCode.Int32:
 				default:
 					return lhsConvertible.ToInt32(null) >> rhsConvertible.ToInt32(null);
 			}
@@ -1539,7 +1536,6 @@ namespace Boo.Lang.Runtime
 					return -operandConvertible.ToInt64(null);
 				case TypeCode.UInt32:
 					return -operandConvertible.ToInt64(null);
-				case TypeCode.Int32:
 				default:
 					return -operandConvertible.ToInt32(null);
 			}
@@ -1681,9 +1677,10 @@ namespace Boo.Lang.Runtime
 				return !string.IsNullOrEmpty((string) value);
 
 			Type type = value.GetType();
+			var dispatcher = GetDispatcher(value, "$ToBool$", new[] {type}, () => CreateBoolConverter(type));
 			return
 				(bool)
-				Dispatch(value, "$ToBool$", new[] {type}, new[] {value}, () => CreateBoolConverter(type));
+				dispatcher(value, new[] {value});
 		}
 
 		public static bool ToBool(decimal value)
@@ -1691,12 +1688,12 @@ namespace Boo.Lang.Runtime
 			return 0 != value;
 		}
 
-		public static bool ToBool(System.Single value)
+		public static bool ToBool(float value)
 		{
 			return 0 != value;
 		}
 
-		public static bool ToBool(System.Double value)
+		public static bool ToBool(double value)
 		{
 			return 0 != value;
 		}
@@ -1725,12 +1722,10 @@ namespace Boo.Lang.Runtime
 		#region conversion proxy helpers
 		internal static MethodInfo FindImplicitConversionOperator(Type from, Type to)
 		{
-			const BindingFlags ConversionOperatorFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy;
-			MethodInfo found = FindImplicitConversionMethod(from.GetMethods(ConversionOperatorFlags), from, to);
-			if (null != found) return found;
-			found = FindImplicitConversionMethod(to.GetMethods(ConversionOperatorFlags), from, to);
-			if (null != found) return found;
-			return FindImplicitConversionMethod(GetExtensionMethods(), from, to);
+			const BindingFlags conversionOperatorFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.FlattenHierarchy;
+			return FindImplicitConversionMethod(from.GetMethods(conversionOperatorFlags), from, to)
+				?? FindImplicitConversionMethod(to.GetMethods(conversionOperatorFlags), from, to)
+				?? FindImplicitConversionMethod(GetExtensionMethods(), from, to);
 		}
 
 		private static IEnumerable<MethodInfo> GetExtensionMethods()
@@ -1740,7 +1735,7 @@ namespace Boo.Lang.Runtime
 					yield return (MethodInfo) member;
 		}
 
-		private static MethodInfo FindImplicitConversionMethod(System.Collections.Generic.IEnumerable<MethodInfo> candidates, Type from, Type to)
+		private static MethodInfo FindImplicitConversionMethod(IEnumerable<MethodInfo> candidates, Type from, Type to)
 		{
 			foreach (MethodInfo m in candidates)
 			{
@@ -1756,21 +1751,17 @@ namespace Boo.Lang.Runtime
 
 		#endregion
 
-		static void Error(string name, params object[] args)
+		static void Error(string format, params object[] args)
 		{
-			throw new ApplicationException(Boo.Lang.ResourceManager.Format(name, args));
-		}
-
-		static void Error(string name)
-		{
-			throw new ApplicationException(Boo.Lang.ResourceManager.GetString(name));
+			throw new ApplicationException(string.Format(format, args));
 		}
 
 		public static string RuntimeDisplayName
 		{
-			get {
-				Type runtime = Type.GetType("Mono.Runtime");
-				return (null != runtime)
+			get
+			{
+				var runtime = Type.GetType("Mono.Runtime");
+				return (runtime != null)
 					? (string) runtime.GetMethod("GetDisplayName", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null)
 					: string.Concat("CLR ", Environment.Version.ToString());
 			}

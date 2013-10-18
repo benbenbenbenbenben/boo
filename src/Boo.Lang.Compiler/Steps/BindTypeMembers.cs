@@ -28,6 +28,8 @@
 
 
 using System;
+using Boo.Lang.Compiler.TypeSystem.Internal;
+using Boo.Lang.Compiler.Util;
 using Boo.Lang.Runtime;
 
 namespace Boo.Lang.Compiler.Steps
@@ -126,8 +128,7 @@ namespace Boo.Lang.Compiler.Steps
 			if (!typeIsCallable)
 			{
 				Errors.Add(
-					CompilerErrorFactory.EventTypeIsNotCallable(node.Type,
-					type.ToString()));
+					CompilerErrorFactory.EventTypeIsNotCallable(node.Type, type));
 			}
 			
 			if (declaringType.IsInterface)
@@ -153,14 +154,10 @@ namespace Boo.Lang.Compiler.Steps
 			Field backingField = CodeBuilder.CreateField("$event$" + node.Name, type);
 			backingField.IsSynthetic = true;
 			backingField.Modifiers = TypeMemberModifiers.Private;
-			if (node.IsTransient)
-			{
+			if (node.HasTransientModifier)
 				backingField.Modifiers |= TypeMemberModifiers.Transient;
-			}
 			if (node.IsStatic)
-			{
 				backingField.Modifiers |= TypeMemberModifiers.Static;
-			}
 			node.DeclaringType.Members.Add(backingField);
 			
 			((InternalEvent)node.Entity).BackingField = (InternalField)backingField.Entity;

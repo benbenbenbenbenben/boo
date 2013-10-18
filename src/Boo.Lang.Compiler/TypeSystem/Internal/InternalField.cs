@@ -26,14 +26,12 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-namespace Boo.Lang.Compiler.TypeSystem
-{
-	using Boo.Lang.Compiler.Ast;
+using Boo.Lang.Compiler.Ast;
 
+namespace Boo.Lang.Compiler.TypeSystem.Internal
+{
 	public class InternalField : InternalEntity<Field>, IField
 	{
-		private object _staticValue;
-		
 		public InternalField(Field field) : base(field)
 		{
 		}
@@ -45,42 +43,23 @@ namespace Boo.Lang.Compiler.TypeSystem
 		
 		public IType Type
 		{
-			get
-			{
-				return null != _node.Type 
-					? TypeSystemServices.GetType(_node.Type)
-					: Unknown.Default;
-			}
+			get { return _node.Type != null ? TypeSystemServices.GetType(_node.Type) : Unknown.Default; }
 		}
 		
 		public bool IsLiteral
 		{
-			get
-			{
-				//return IsStatic && IsInitOnly && TypeSystemServices.IsPrimitiveTypeOrString(Type);
-				return null != _staticValue;
-			}
+			get { return StaticValue != null; }
 		}
 		
 		public bool IsInitOnly
 		{
-			get
-			{
-				return _node.IsFinal;
-			}
+			get { return _node.IsFinal; }
 		}
-		
+
 		public object StaticValue
 		{
-			get
-			{
-				return _staticValue;
-			}
-			
-			set
-			{
-				_staticValue = value;
-			}
+			get;
+			set;
 		}
 
 		public bool IsVolatile
@@ -90,10 +69,7 @@ namespace Boo.Lang.Compiler.TypeSystem
 
 		public Field Field
 		{
-			get
-			{
-				return _node;
-			}
+			get { return _node; }
 		}
 		
 		override public string ToString()

@@ -1,6 +1,6 @@
 namespace Boo.Lang.PatternMatching.Tests
 
-import NUnit.Framework
+import NUnit.Framework(TestFixtureAttribute, TestAttribute, Assert)
 import Boo.Lang.PatternMatching
 	
 class Container[of T]:
@@ -11,6 +11,46 @@ class Collection:
 	
 [TestFixture]
 class MatchMacroTest:
+	
+	[Test]
+	def MemberReferenceTarget():
+		expected = 42
+		actual = singleItemOfContainedList(Container of Collection(value: Collection(Items: [expected])))
+		Assert.AreEqual(expected, actual)
+		
+	def singleItemOfContainedList(container):
+		match container:
+			case Container of Collection(value.Items: (item,)):
+				return item
+
+	[Test]
+	def TestEmptyArrayMatch():
+		a = Collection(Items: [])
+		match a:
+			case Collection(Items: (,))	
+
+	[Test]
+	def DoubleMatch():
+		Assert.AreEqual("int int", doubleMatch(1, 2))
+		Assert.AreEqual("int string", doubleMatch(1, '2'))
+		Assert.AreEqual("_ string", doubleMatch(1.0, '2'))
+		
+	[Test]
+	def DoubleMatchErrorIncludesBothArguments():
+		try:
+			doubleMatch('2', 42)
+			Assert.Fail("MatchError expected")	
+		except e as MatchError:
+			Assert.AreEqual("`a` failed to match `2` or `b` failed to match `42`", e.Message)
+		
+	def doubleMatch(a, b):
+		match a, b:
+			case int(), int():
+				return "int int"
+			case int(), string():
+				return "int string"
+			case _, string():
+				return "_ string"
 	
 	[Test]
 	def TestFixedSizeCollection():
@@ -33,9 +73,9 @@ class MatchMacroTest:
 		Assert.AreEqual(2, lastIntItemBeforeCatchAll(Collection(Items: [1, 2, "_", "__"])))
 
 	[Test]
-	[ExpectedException(MatchError)]
 	def TestMatchErrorOnFixedSize():
-		lastItem(Collection(Items: [1, 2, 3]))
+		expectingMatchError:
+			lastItem(Collection(Items: [1, 2, 3]))
 	
 	[Test]
 	def TestGenericMatch():
@@ -68,10 +108,10 @@ class MatchMacroTest:
 	def TestImplicitPropertyPattern():
 		Assert.AreEqual("FOO", itemByImplicitNameReference(Item(Name: "foo")))
 											
-	[Test]
-	[ExpectedException(MatchError)]
+	[Test]	
 	def TestMatchErrorOnPropertyPattern():
-		itemByName(42)
+		expectingMatchError:
+			itemByName(42)
 		
 	[Test]
 	def TestMatchErrorMessageIncludesValue():
@@ -80,10 +120,10 @@ class MatchMacroTest:
 		except e as MatchError:
 			Assert.AreEqual("`o` failed to match `42`", e.Message)
 		
-	[Test]
-	[ExpectedException(MatchError)]
+	[Test]	
 	def TestMatchErrorOnNestedPropertyPattern():
-		nestedByName(42)
+		expectingMatchError:
+			nestedByName(42)
 		
 	[Test]
 	def TestCaseCapture():
@@ -161,9 +201,30 @@ class MatchMacroTest:
 		Assert.AreEqual("Baz", matchMemberRef(Foo.Baz))
 		
 	[Test]
-	[ExpectedException(MatchError)]
 	def TestMatchErrorOnMemberReferencePattern():
-		matchMemberRef(Foo.None)
+		expectingMatchError:
+			matchMemberRef(Foo.None)
+
+	[Test]
+	def TestMatchArrayInvocation():
+		Assert.AreEqual(3, MatchArray(1,10,3))
+		Assert.AreEqual(true, MatchEmptyArray())
+		Assert.AreEqual('bar', MatchStarArray('foo', 'bar', 'baz'))
+
+	def MatchArray(*value):
+		match value:
+			case array(_,_,a):
+				return a
+
+	def MatchEmptyArray(*value):
+		match value:
+			case array():
+				return true
+
+	def MatchStarArray(*value):
+		match value:
+			case array('foo', a, *_):
+				return a
 
 	def itemByName(o):
 		match o:

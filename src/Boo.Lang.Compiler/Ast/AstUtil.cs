@@ -26,6 +26,7 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
+using System.Linq;
 using Boo.Lang.Environments;
 
 namespace Boo.Lang.Compiler.Ast
@@ -37,7 +38,7 @@ namespace Boo.Lang.Compiler.Ast
 	using System.Collections.Generic;
 	using System.Text.RegularExpressions;
 
-	public class AstUtil
+	public static class AstUtil
 	{
 		public static bool IsOverloadableOperator(BinaryOperatorType op)
 		{
@@ -71,31 +72,12 @@ namespace Boo.Lang.Compiler.Ast
 
 		public static string GetMethodNameForOperator(BinaryOperatorType op)
 		{
-			return "op_" + op.ToString();
+			return "op_" + op;
 		}
 		
 		public static string GetMethodNameForOperator(UnaryOperatorType op)
 		{
-			return "op_" + op.ToString();
-		}
-
-		public static bool IsComplexSlicing(SlicingExpression node)
-		{
-			foreach (Slice slice in node.Indices)
-			{
-				if (IsComplexSlice(slice))
-				{
-					return true;
-				}
-			}
-			return false;
-		}
-		
-		public static bool IsComplexSlice(Slice slice)
-		{
-			return null != slice.End
-				|| null != slice.Step
-				|| OmittedExpression.Default == slice.Begin;
+			return "op_" + op;
 		}
 
 		public static Node GetMemberAnchor(Node node)
@@ -312,27 +294,30 @@ namespace Boo.Lang.Compiler.Ast
 			return false;
 		}
 		
+		[Obsolete("Use node.IsTargetOfAssignment()")]
 		public static bool IsLhsOfAssignment(Expression node)
 		{
-			if (NodeType.BinaryExpression == node.ParentNode.NodeType)
-			{
-				BinaryExpression be = (BinaryExpression)node.ParentNode;
-				if (node == be.Left)
-					return IsAssignment(be);
-			}
-			return false;
+			return node.IsTargetOfAssignment();
+		}
+
+		public static bool IsRhsOfAssignment(Expression node)
+		{
+			var parentExpression = node.ParentNode as BinaryExpression;
+			if (parentExpression == null)
+				return false;
+			return node == parentExpression.Right && IsAssignment(parentExpression);
 		}
 		
 		public static bool IsLhsOfInPlaceAddSubtract(Expression node)
 		{
 			if (NodeType.BinaryExpression == node.ParentNode.NodeType)
 			{
-				BinaryExpression be = (BinaryExpression)node.ParentNode;
+				var be = (BinaryExpression)node.ParentNode;
 				if (node == be.Left)
 				{
-					BinaryOperatorType op = be.Operator;
-					return op == BinaryOperatorType.InPlaceAddition ||
-							op == BinaryOperatorType.InPlaceSubtraction;
+					var op = be.Operator;
+					return op == BinaryOperatorType.InPlaceAddition
+						|| op == BinaryOperatorType.InPlaceSubtraction;
 				}
 			}
 			return false;
@@ -348,20 +333,14 @@ namespace Boo.Lang.Compiler.Ast
 
 		public static Constructor CreateConstructor(Node lexicalInfoProvider, TypeMemberModifiers modifiers)
 		{
-			Constructor constructor = new Constructor(lexicalInfoProvider.LexicalInfo);
-			constructor.Modifiers = modifiers;
-			constructor.IsSynthetic = true;
-			return constructor;
+			return new Constructor(lexicalInfoProvider.LexicalInfo) { Modifiers = modifiers, IsSynthetic = true };
 		}
 
 		public static Constructor CreateDefaultConstructor(TypeDefinition type)
 		{
 			TypeMemberModifiers modifiers = TypeMemberModifiers.Public;
-			if (type is Module)
-				modifiers = TypeMemberModifiers.Private;
 			if (type.IsAbstract)
 				modifiers = TypeMemberModifiers.Protected;
-
 			return CreateConstructor(type, modifiers);
 		}
 
@@ -388,34 +367,27 @@ namespace Boo.Lang.Compiler.Ast
 		
 		public static MethodInvocationExpression CreateMethodInvocationExpression(LexicalInfo li, Expression target, Expression arg)
 		{
-			MethodInvocationExpression mie = new MethodInvocationExpression(li);
-			mie.Target = (Expression)target.Clone();			
+			var mie = new MethodInvocationExpression(li) { Target = (Expression) target.Clone(), IsSynthetic = true };
 			mie.Arguments.Add((Expression)arg.Clone());
-			mie.IsSynthetic = true;
 			return mie;
 		}
 
 		public static bool IsExplodeExpression(Node node)
 		{
-			UnaryExpression e = node as UnaryExpression;
-			return null == e ? false : e.Operator == UnaryOperatorType.Explode;
+			var e = node as UnaryExpression;
+			return e == null ? false : e.Operator == UnaryOperatorType.Explode;
 		}
 
 		public static bool IsIndirection(Node node)
 		{
-			UnaryExpression e = node as UnaryExpression;
-			return null == e ? false : e.Operator == UnaryOperatorType.Indirection;
-		}
-
-		private AstUtil()
-		{
+			var e = node as UnaryExpression;
+			return e == null ? false : e.Operator == UnaryOperatorType.Indirection;
 		}
 
 		public static string ToXml(Node node)
 		{
-			StringWriter writer = new StringWriter();
-			XmlSerializer serializer = new XmlSerializer(node.GetType());
-			serializer.Serialize(writer, node);
+			var writer = new StringWriter();
+			new XmlSerializer(node.GetType()).Serialize(writer, node);
 			return writer.ToString();
 		}
 
@@ -447,20 +419,18 @@ namespace Boo.Lang.Compiler.Ast
 		//use this to build a type member name unique in the inheritance hierarchy.
 		public static string BuildUniqueTypeMemberName(TypeDefinition type, string name)
 		{
-			if (String.IsNullOrEmpty(name))
+			if (string.IsNullOrEmpty(name))
 				throw new ArgumentNullException("name");
 
-			StringBuilder nameBuilder = new StringBuilder("$");
+			var nameBuilder = new StringBuilder("$");
 			nameBuilder.Append(name);
 			nameBuilder.Append("__");
 			nameBuilder.Append(type.QualifiedName);
 			if (type.HasGenericParameters)
 			{
 				nameBuilder.Append("_");
-				string[] parameterNames = Array.ConvertAll(
-					type.GenericParameters.ToArray(),
-					delegate(GenericParameterDeclaration gpd) { return gpd.Name; });
-				foreach (string parameterName in parameterNames)
+
+				foreach (var parameterName in type.GenericParameters.Select(gpd => gpd.Name))
 				{
 					nameBuilder.Append("_");
 					nameBuilder.Append(parameterName);
@@ -476,45 +446,36 @@ namespace Boo.Lang.Compiler.Ast
 			if (method.Locals.Count == 0)
 				return null;
 
-			foreach (Local local in method.Locals) {
-				if (!local.PrivateScope && local.Name == name)
-					return local;
-			}
-			return null;
+			return method.Locals.FirstOrDefault(local => !local.PrivateScope && local.Name == name);
 		}
 
 		public static LexicalInfo SafeLexicalInfo(Node node)
 		{
-			if (null == node) return LexicalInfo.Empty;
-			LexicalInfo info = node.LexicalInfo;
-			if (info.IsValid) return info;
-			return SafeLexicalInfo(node.ParentNode);
+			if (node == null)
+				return LexicalInfo.Empty;
+			var info = node.LexicalInfo;
+			return info.IsValid ? info : SafeLexicalInfo(node.ParentNode);
 		}
 
 		public static string SafePositionOnlyLexicalInfo(Node node)
 		{
-			LexicalInfo info = SafeLexicalInfo(node);
-			return String.Format("({0},{1})", info.Line, info.Column);
+			var info = SafeLexicalInfo(node);
+			return string.Format("({0},{1})", info.Line, info.Column);
 		}
 
 		public static ICollection<TValue> GetValues<TNode, TValue>(NodeCollection<TNode> nodes)
 			where TNode : LiteralExpression
 		{
-			List<TValue> values = new List<TValue>(nodes.Count);
-
-			foreach (TNode node in nodes)
-				values.Add((TValue) Convert.ChangeType(node.ValueObject, typeof(TValue)));
-
-			return values;
+			return nodes.Select(node => (TValue) Convert.ChangeType(node.ValueObject, typeof(TValue))).ToList();
 		}
 
 		internal static bool AllCodePathsReturnOrRaise(Block block)
 		{
-			if (null == block || block.IsEmpty)
+			if (block == null || block.IsEmpty)
 				return false;
 
-			Node node = block.LastStatement;
-			NodeType last = node.NodeType;
+			var node = block.LastStatement;
+			var last = node.NodeType;
 			switch (last)
 			{
 				case NodeType.ReturnStatement:
@@ -525,23 +486,18 @@ namespace Boo.Lang.Compiler.Ast
 					return AllCodePathsReturnOrRaise((Block)node);
 
 				case NodeType.IfStatement:
-					IfStatement ifstmt = (IfStatement) node;
+					var ifstmt = (IfStatement) node;
 					return
 						AllCodePathsReturnOrRaise(ifstmt.TrueBlock)
 						&& AllCodePathsReturnOrRaise(ifstmt.FalseBlock);
 
 				case NodeType.TryStatement:
-					TryStatement ts = (TryStatement) node;
+					var ts = (TryStatement) node;
 					if (!AllCodePathsReturnOrRaise(ts.ProtectedBlock))
 						return false;
 					//if (null != ts.FailureBlock && !EndsWithReturnStatement(ts.FailureBlock))
 					//	return false;
-					foreach (ExceptionHandler handler in ts.ExceptionHandlers)
-					{
-						if (!AllCodePathsReturnOrRaise(handler.Block))
-							return false;
-					}
-					return true;
+					return ts.ExceptionHandlers.Select(handler => handler.Block).All(AllCodePathsReturnOrRaise);
 			}
 			return false;
 		}
@@ -616,6 +572,23 @@ namespace Boo.Lang.Compiler.Ast
 		public static bool EndsWithExplodeExpression(ExpressionCollection expressionCollection)
 		{
 			return expressionCollection.Count > 0 && IsExplodeExpression(expressionCollection[-1]);
+		}
+
+		public static string TypeKeywordFor(TypeDefinition node)
+		{
+			switch (node.NodeType)
+			{
+				case NodeType.ClassDefinition:
+					return "class";
+				case NodeType.InterfaceDefinition:
+					return "interface";
+				case NodeType.StructDefinition:
+					return "struct";
+				case NodeType.EnumDefinition:
+					return "enum";
+				default:
+					throw new ArgumentException("Unsupported type definition kind: " + node.NodeType, "node");
+			}
 		}
 	}
 }

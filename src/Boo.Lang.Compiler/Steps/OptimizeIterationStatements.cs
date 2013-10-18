@@ -29,6 +29,8 @@
 //Authored by Cameron Kenneth Knight: http://jira.codehaus.org/browse/BOO-137
 
 using Boo.Lang.Compiler.TypeSystem.Core;
+using Boo.Lang.Compiler.TypeSystem.Internal;
+using Boo.Lang.Compiler.Util;
 using Boo.Lang.Runtime;
 
 namespace Boo.Lang.Compiler.Steps
@@ -52,10 +54,6 @@ namespace Boo.Lang.Compiler.Steps
 
 		Method _currentMethod;
 
-		public OptimizeIterationStatements()
-		{
-		}
-		
 		override public void Initialize(CompilerContext context)
 		{
 			base.Initialize(context);

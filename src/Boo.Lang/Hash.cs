@@ -73,9 +73,11 @@ namespace Boo.Lang
 		{
 		}
 
+#if !NO_SERIALIZATION_INFO
 		public Hash(SerializationInfo info, StreamingContext context) : base(info, context)
 		{
 		}
+#endif
 
 		override public object Clone()
 		{

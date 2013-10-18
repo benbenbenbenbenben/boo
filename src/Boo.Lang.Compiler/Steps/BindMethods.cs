@@ -38,7 +38,7 @@ namespace Boo.Lang.Compiler.Steps
 	/// Pre-binds methods and constructors before resolving type references, 
 	/// to enable correct resolution of generic type references.
 	/// </summary>
-	public class BindMethods : AbstractVisitorCompilerStep, ITypeMemberReifier
+	public class BindMethods : AbstractFastVisitorCompilerStep, ITypeMemberReifier
 	{
 		private InternalTypeSystemProvider _internalTypeSystemProvider;
 
@@ -79,11 +79,6 @@ namespace Boo.Lang.Compiler.Steps
 			Visit(node.Members);
 		}
 		
-		override public void Run()
-		{			
-			Visit(CompileUnit.Modules);
-		}
-
         public virtual TypeMember Reify(TypeMember member)
         {
         	member.Accept(this);

@@ -25,6 +25,7 @@ namespace BooCompiler.Tests
 			CopyAssembliesFromTestCasePath();
 		}
 
+
 		[Test]
 		public void ambiguous_1()
 		{
@@ -41,6 +42,12 @@ namespace BooCompiler.Tests
 		public void array_enumerable_2()
 		{
 			RunCompilerTestCase(@"array-enumerable-2.boo");
+		}
+		
+		[Test]
+		public void automatic_generic_method_stub()
+		{
+			RunCompilerTestCase(@"automatic-generic-method-stub.boo");
 		}
 		
 		[Test]
@@ -191,6 +198,24 @@ namespace BooCompiler.Tests
 		public void generic_inheritance_1()
 		{
 			RunCompilerTestCase(@"generic-inheritance-1.boo");
+		}
+		
+		[Test]
+		public void generic_instance_overload()
+		{
+			RunCompilerTestCase(@"generic-instance-overload.boo");
+		}
+		
+		[Test]
+		public void generic_list_of_callable()
+		{
+			RunCompilerTestCase(@"generic-list-of-callable.boo");
+		}
+		
+		[Test]
+		public void generic_matrix_1()
+		{
+			RunCompilerTestCase(@"generic-matrix-1.boo");
 		}
 		
 		[Test]
@@ -377,6 +402,12 @@ namespace BooCompiler.Tests
 		public void interface_1()
 		{
 			RunCompilerTestCase(@"interface-1.boo");
+		}
+		
+		[Test]
+		public void interface_with_generic_method()
+		{
+			RunCompilerTestCase(@"interface-with-generic-method.boo");
 		}
 		
 		[Test]

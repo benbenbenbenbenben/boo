@@ -1,34 +1,65 @@
-﻿using System;
+﻿#region license
+// Copyright (c) 2009 Rodrigo B. de Oliveira (rbo@acm.org)
+// All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without modification,
+// are permitted provided that the following conditions are met:
+// 
+//     * Redistributions of source code must retain the above copyright notice,
+//     this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//     * Neither the name of Rodrigo B. de Oliveira nor the names of its
+//     contributors may be used to endorse or promote products derived from this
+//     software without specific prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+// THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#endregion
+
+
+using System;
 using System.Collections.Generic;
 
 namespace Boo.Lang.Compiler.Util
 {
 	public class MemoizedFunction<TArg, TResult>
 	{
+		private readonly IEqualityComparer<TArg> _comparer;
 		private readonly Func<TArg, TResult> _function;
 		private readonly IDictionary<TArg, TResult> _cachedValues;
 
-		public MemoizedFunction(IEqualityComparer<TArg> comparer, Func<TArg, TResult> function)
-		{
-			_function = function;
-			_cachedValues = new Dictionary<TArg, TResult>(comparer);
-		}
-
-		public MemoizedFunction(Func<TArg, TResult> function) : this(SafeComparer<TArg>.Instance, function)
+		public MemoizedFunction(Func<TArg, TResult> function)
+			: this(SafeComparer<TArg>.Instance, function)
 		{
 			//NB: SafeComparer is required to workaround a weird RuntimeMethodInfo.Equals bug
-			//    when TKey is a MemberInfo on .NET 3.5 (not reproducible on 2.0, 4.0b1 and mono)
+			//	  when TKey is a MemberInfo on .NET 3.5 (not reproducible on 2.0, 4.0b1 and mono)
 		}
 
-		private MemoizedFunction(IDictionary<TArg, TResult> cachedValues, Func<TArg, TResult> function)
+		public MemoizedFunction(IEqualityComparer<TArg> comparer, Func<TArg, TResult> function)
+			: this(comparer, function, new Dictionary<TArg, TResult>(comparer))
+		{
+		}
+
+		private MemoizedFunction(IEqualityComparer<TArg> comparer, Func<TArg, TResult> function, IDictionary<TArg, TResult> cachedValues)
 		{
 			_cachedValues = cachedValues;
 			_function = function;
+			_comparer = comparer;
 		}
 
 		public MemoizedFunction<TArg, TResult> Clone()
 		{
-			return new MemoizedFunction<TArg, TResult>(new Dictionary<TArg, TResult>(_cachedValues), _function);
+			return new MemoizedFunction<TArg, TResult>(_comparer, _function, new Dictionary<TArg, TResult>(_cachedValues, _comparer));
 		}
 
 		public ICollection<TResult> Values
@@ -93,7 +124,8 @@ namespace Boo.Lang.Compiler.Util
 		readonly Dictionary<T1, Dictionary<T2, TResult>> _cache;
 		readonly Func<T1, T2, TResult> _func;
 
-		public MemoizedFunction(Func<T1, T2, TResult> func) : this(SafeComparer<T1>.Instance, func)
+		public MemoizedFunction(Func<T1, T2, TResult> func)
+			: this(SafeComparer<T1>.Instance, func)
 		{
 		}
 

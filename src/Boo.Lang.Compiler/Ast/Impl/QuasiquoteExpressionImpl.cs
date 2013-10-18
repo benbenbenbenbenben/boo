@@ -72,8 +72,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			QuasiquoteExpression other = node as QuasiquoteExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( QuasiquoteExpression)node;
 			if (_node != other._node) return NoMatch("QuasiquoteExpression._node");
 			return true;
 		}
@@ -91,13 +92,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			QuasiquoteExpression clone = (QuasiquoteExpression)FormatterServices.GetUninitializedObject(typeof(QuasiquoteExpression));
+		
+			QuasiquoteExpression clone = new QuasiquoteExpression();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._expressionType = _expressionType;
 			if (null != _node)
 			{
@@ -105,6 +107,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._node.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

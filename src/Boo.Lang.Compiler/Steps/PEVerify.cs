@@ -28,7 +28,6 @@
 
 namespace Boo.Lang.Compiler.Steps
 {
-	using System.ComponentModel;
 	using System.Diagnostics;
 	using Boo.Lang.Compiler;
 
@@ -37,7 +36,7 @@ namespace Boo.Lang.Compiler.Steps
 		
 		override public void Run()
 		{			
-#if !NO_SYSTEM_DLL
+#if !NO_SYSTEM_PROCESS
 			if (Errors.Count > 0)
 				return;
 
@@ -59,12 +58,10 @@ namespace Boo.Lang.Compiler.Steps
 			
 			try
 			{
-				Process p = Boo.Lang.Builtins.shellp(command, arguments);
+				var p = Builtins.shellp(command, arguments);
 				p.WaitForExit();
 				if (0 != p.ExitCode)
-				{
-					Errors.Add(new CompilerError(Boo.Lang.Compiler.Ast.LexicalInfo.Empty, p.StandardOutput.ReadToEnd()));
-				}
+					Errors.Add(new CompilerError(Ast.LexicalInfo.Empty, p.StandardOutput.ReadToEnd()));
 			}
 			catch (System.Exception e)
             {

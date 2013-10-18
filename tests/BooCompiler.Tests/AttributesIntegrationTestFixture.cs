@@ -91,9 +91,33 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void module_ast_attribute()
+		{
+			RunCompilerTestCase(@"module-ast-attribute.boo");
+		}
+		
+		[Test]
 		public void ns_alias_on_attribute()
 		{
 			RunCompilerTestCase(@"ns_alias_on_attribute.boo");
+		}
+		
+		[Test]
+		public void transient()
+		{
+			RunCompilerTestCase(@"transient.boo");
+		}
+		
+		[Test]
+		public void varargs_attribute_external()
+		{
+			RunCompilerTestCase(@"varargs-attribute-external.boo");
+		}
+		
+		[Test]
+		public void varargs_attribute_internal()
+		{
+			RunCompilerTestCase(@"varargs-attribute-internal.boo");
 		}
 		
 

@@ -39,6 +39,7 @@ using Boo.Lang.Compiler.Util;
 using Boo.Lang.Compiler.TypeSystem;
 using Boo.Lang.Compiler.TypeSystem.Reflection;
 using Boo.Lang.Environments;
+using Boo.Lang.Resources;
 
 namespace Boo.Lang.Compiler
 {
@@ -51,53 +52,23 @@ namespace Boo.Lang.Compiler
 
 		private TextWriter _outputWriter;
 
-		private CompilerPipeline _pipeline;
-
 		private readonly CompilerInputCollection _input;
 
 		private readonly CompilerResourceCollection _resources;
 
 		private CompilerReferenceCollection _compilerReferences;
 
-		private int _maxExpansionIterations;
-
 		private string _outputAssembly;
 
-		private CompilerOutputType _outputType;
-
-		private bool _debug;
-
-		private bool _ducky;
-
-		private bool _checked;
-
 		private bool _strict;
-
-		private bool _generateInMemory;
-
-		private bool _stdLib;
-
-		private string _keyFile;
-
-		private string _keyContainer;
-
-		private bool _delaySign;
 
 		private readonly List<string> _libPaths;
 
 		private readonly string _systemDir;
 
 		private Assembly _booAssembly;
-		
-		private bool _whiteSpaceAgnostic;
-
-		private TraceSwitch _traceSwitch;
 
 		private readonly Dictionary<string, string> _defines = new Dictionary<string, string>(StringComparer.Ordinal);
-
-		private bool _unsafe;
-
-		private string _platform;
 
 		private TypeMemberModifiers _defaultTypeVisibility = TypeMemberModifiers.Public;
 		private TypeMemberModifiers _defaultMethodVisibility = TypeMemberModifiers.Public;
@@ -109,7 +80,11 @@ namespace Boo.Lang.Compiler
 		public CompilerParameters() : this(true)
 		{
 		}
-		
+
+		public CompilerParameters(bool loadDefaultReferences) : this(SharedTypeSystemProvider, loadDefaultReferences)
+		{	
+		}
+
 		public CompilerParameters(IReflectionTypeSystemProvider reflectionProvider) : this(reflectionProvider, true)
 		{
 		}
@@ -123,63 +98,71 @@ namespace Boo.Lang.Compiler
 				_libPaths.Add(_systemDir);
 				_libPaths.Add(Directory.GetCurrentDirectory());
 			}
-			_pipeline = null;
 			_input = new CompilerInputCollection();
 			_resources = new CompilerResourceCollection();
 			_compilerReferences = new CompilerReferenceCollection(reflectionProvider);
 
-			_maxExpansionIterations = 12;
+			MaxExpansionIterations = 12;
 			_outputAssembly = String.Empty;
-			_outputType = CompilerOutputType.Auto;
+			OutputType = CompilerOutputType.Auto;
 			_outputWriter = Console.Out;
-			_debug = true;
-			_checked = true;
-			_generateInMemory = true;
-			_stdLib = true;
-
-			if (Permissions.WithEnvironmentPermission(() => System.Environment.GetEnvironmentVariable("TRACE") != null))
-				EnableTraceSwitch();
-
-			_delaySign = false;
+			Debug = true;
+			Checked = true;
+			GenerateInMemory = true;
+			StdLib = true;
+			DelaySign = false;
 
 			Strict = false;
+			TraceLevel = DefaultTraceLevel();
 
 			if (loadDefaultReferences)
 				LoadDefaultReferences();
 		}
 
-		public CompilerParameters(bool loadDefaultReferences) : this(SharedTypeSystemProvider, loadDefaultReferences)
-		{	
+		private static TraceLevel DefaultTraceLevel()
+		{
+			var booTraceLevel = Permissions.WithEnvironmentPermission(() => System.Environment.GetEnvironmentVariable("BOO_TRACE_LEVEL"));
+			return string.IsNullOrEmpty(booTraceLevel) ? TraceLevel.Off : (TraceLevel)Enum.Parse(typeof(TraceLevel), booTraceLevel);
 		}
 
 		public void LoadDefaultReferences()
 		{
+			//boo.lang.dll
+			_booAssembly = typeof(Builtins).Assembly;
+			_compilerReferences.Add(_booAssembly);
+
+			//boo.lang.extensions.dll
+			//try loading extensions next to Boo.Lang (in the same directory)
+			var extensionsAssembly = TryToLoadExtensionsAssembly();
+			if (extensionsAssembly != null)
+				_compilerReferences.Add(extensionsAssembly);
+
+			//boo.lang.compiler.dll
+			_compilerReferences.Add(GetType().Assembly);
+
 			//mscorlib
 			_compilerReferences.Add(LoadAssembly("mscorlib", true));
 			//System
 			_compilerReferences.Add(LoadAssembly("System", true));
 			//System.Core
 			_compilerReferences.Add(LoadAssembly("System.Core", true));
-			//boo.lang.dll
-			_booAssembly = typeof(Boo.Lang.Builtins).Assembly;
-			_compilerReferences.Add(_booAssembly);
 
-			//boo.lang.extensions.dll
-			//try loading extensions next to Boo.Lang (in the same directory)
-			const string booLangExtensionsDll = "Boo.Lang.Extensions.dll";
-			var tentative = Permissions.WithDiscoveryPermission(() => Path.Combine(Path.GetDirectoryName(_booAssembly.Location), booLangExtensionsDll))
-				?? booLangExtensionsDll;
-
-			var extensionsAssembly = LoadAssembly(tentative, false) ?? LoadAssembly("Boo.Lang.Extensions", false);
-			if (extensionsAssembly != null)
-				_compilerReferences.Add(extensionsAssembly);
-
-			if (TraceInfo)
+			Permissions.WithDiscoveryPermission<object>(() =>
 			{
-				Trace.WriteLine("BOO LANG DLL: " + _booAssembly.Location);
-				Trace.WriteLine("BOO COMPILER EXTENSIONS DLL: " + 
-				                (extensionsAssembly != null ? extensionsAssembly.ToString() : "NOT FOUND!"));
-			}
+				WriteTraceInfo("BOO LANG DLL: " + _booAssembly.Location);
+				WriteTraceInfo("BOO COMPILER EXTENSIONS DLL: " + (extensionsAssembly != null ? extensionsAssembly.ToString() : "NOT FOUND!"));
+				return null;
+			});
+		}
+
+		private IAssemblyReference TryToLoadExtensionsAssembly()
+		{
+			const string booLangExtensionsDll = "Boo.Lang.Extensions.dll";
+			return Permissions.WithDiscoveryPermission(() =>
+			{
+				var path = Path.Combine(Path.GetDirectoryName(_booAssembly.Location), booLangExtensionsDll);
+				return File.Exists(path) ? AssemblyReferenceFor(Assembly.LoadFrom(path)) : null;
+			}) ?? LoadAssembly(booLangExtensionsDll, false);
 		}
 
 		public Assembly BooAssembly
@@ -218,32 +201,23 @@ namespace Boo.Lang.Compiler
 		public IAssemblyReference LoadAssembly(string assemblyName, bool throwOnError)
 		{
 			var assembly = ForName(assemblyName, throwOnError);
-			if (null == assembly)
-				return null;
+			return assembly != null ? AssemblyReferenceFor(assembly) : null;
+		}
+
+		private IAssemblyReference AssemblyReferenceFor(Assembly assembly)
+		{
 			return _compilerReferences.Provider.ForAssembly(assembly);
 		}
 
-		private Assembly ForName(string assembly, bool throwOnError)
+		protected virtual Assembly ForName(string assembly, bool throwOnError)
 		{
 			Assembly a = null;
 			try
 			{
 				if (assembly.IndexOfAny(new char[] {'/', '\\'}) != -1)
-				{
-					//nant passes full path to gac dlls, which compiler doesn't like:
-					//if (assembly.ToLower().StartsWith(_systemDir.ToLower()))
-					{
-						//return LoadAssemblyFromGac(Path.GetFileName(assembly));
-					}
-					//else //load using path  
-					{
-						a = Assembly.LoadFrom(assembly);
-					}
-				}
+					a = Assembly.LoadFrom(assembly);
 				else
-				{
 					a = LoadAssemblyFromGac(assembly);
-				}
 			}
 			catch (FileNotFoundException /*ignored*/)
 			{
@@ -252,17 +226,17 @@ namespace Boo.Lang.Compiler
 			catch (BadImageFormatException e)
 			{
 				if (throwOnError)
-					throw new ApplicationException(ResourceManager.Format("BooC.BadFormat", e.FusionLog), e);
+					throw new ApplicationException(string.Format(Boo.Lang.Resources.StringResources.BooC_BadFormat, e.FusionLog), e);
 			}
 			catch (FileLoadException e)
 			{
 				if (throwOnError)
-					throw new ApplicationException(ResourceManager.Format("BooC.UnableToLoadAssembly", e.FusionLog), e);
+					throw new ApplicationException(string.Format(Boo.Lang.Resources.StringResources.BooC_UnableToLoadAssembly, e.FusionLog), e);
 			}
 			catch (ArgumentNullException e)
 			{
 				if (throwOnError)
-					throw new ApplicationException(ResourceManager.Format("BooC.NullAssembly"), e);
+					throw new ApplicationException(Boo.Lang.Resources.StringResources.BooC_NullAssembly, e);
 			}
 			return a ?? LoadAssemblyFromLibPaths(assembly, false);
 		}
@@ -294,9 +268,7 @@ namespace Boo.Lang.Compiler
 			}
 			if (throwOnError)
 			{
-				throw new ApplicationException(ResourceManager.Format(
-				                               	"BooC.CannotFindAssembly",
-				                               	assembly));
+				throw new ApplicationException(string.Format(Boo.Lang.Resources.StringResources.BooC_CannotFindAssembly, assembly));
 				//assembly, total_log)); //total_log contains the fusion log
 			}
 			return a;
@@ -339,14 +311,21 @@ namespace Boo.Lang.Compiler
 			{
 				string reference = r.Trim();
 				if (reference.Length == 0) continue;
-				Trace.WriteLine("LOADING REFERENCE FROM PKGCONFIG '" + package + "' : " + reference);
+				WriteTraceInfo("LOADING REFERENCE FROM PKGCONFIG '" + package + "' : " + reference);
 				References.Add(LoadAssembly(reference));
 			}
 		}
 
+		[Conditional("TRACE")]
+		private void WriteTraceInfo(string message)
+		{
+			if (TraceInfo)
+				Console.Error.WriteLine(message);
+		}
+
 		private static string pkgconfig(string package)
 		{
-#if NO_SYSTEM_DLL
+#if NO_SYSTEM_PROCESS
 	        throw new System.NotSupportedException();
 #else
 			Process process;
@@ -356,19 +335,18 @@ namespace Boo.Lang.Compiler
 			}
 			catch (Exception e)
 			{
-				throw new ApplicationException(ResourceManager.GetString("BooC.PkgConfigNotFound"), e);
+				throw new ApplicationException(StringResources.BooC_PkgConfigNotFound, e);
 			}
 			process.WaitForExit();
 			if (process.ExitCode != 0)
 			{
-				throw new ApplicationException(
-					ResourceManager.Format("BooC.PkgConfigReportedErrors", process.StandardError.ReadToEnd()));
+				throw new ApplicationException(string.Format(StringResources.BooC_PkgConfigReportedErrors, process.StandardError.ReadToEnd()));
 			}
 			return process.StandardOutput.ReadToEnd();
 #endif
 		}
 
-		private string GetSystemDir()
+		private static string GetSystemDir()
 		{
 			return Path.GetDirectoryName(typeof(string).Assembly.Location);
 		}
@@ -377,12 +355,7 @@ namespace Boo.Lang.Compiler
 		/// Max number of iterations for the application of AST attributes and the
 		/// expansion of macros.		
 		/// </summary>
-		public int MaxExpansionIterations
-		{
-			get { return _maxExpansionIterations; }
-
-			set { _maxExpansionIterations = value; }
-		}
+		public int MaxExpansionIterations { get; set; }
 
 		public CompilerInputCollection Input
 		{
@@ -413,12 +386,7 @@ namespace Boo.Lang.Compiler
 		/// <summary>
 		/// The compilation pipeline.
 		/// </summary>
-		public CompilerPipeline Pipeline
-		{
-			get { return _pipeline; }
-
-			set { _pipeline = value; }
-		}
+		public CompilerPipeline Pipeline { get; set; }
 
 		/// <summary>
 		/// The name (full or partial) for the file
@@ -439,26 +407,11 @@ namespace Boo.Lang.Compiler
 		/// Type and execution subsystem for the generated portable
 		/// executable file.
 		/// </summary>
-		public CompilerOutputType OutputType
-		{
-			get { return _outputType; }
+		public CompilerOutputType OutputType { get; set; }
 
-			set { _outputType = value; }
-		}
+		public bool GenerateInMemory { get; set; }
 
-		public bool GenerateInMemory
-		{
-			get { return _generateInMemory; }
-
-			set { _generateInMemory = value; }
-		}
-
-		public bool StdLib
-		{
-			get { return _stdLib; }
-
-			set { _stdLib = value; }
-		}
+		public bool StdLib { get; set; }
 
 		public TextWriter OutputWriter
 		{
@@ -471,56 +424,22 @@ namespace Boo.Lang.Compiler
 			}
 		}
 
-		public bool Debug
-		{
-			get { return _debug; }
-
-			set { _debug = value; }
-		}
+		public bool Debug { get; set; }
 
 		/// <summary>
-		/// Use duck instead of object as the most generic type.
+		/// Treat System.Object as duck
 		/// </summary>
-		public bool Ducky
-		{
-			get { return _ducky; }
+		public virtual bool Ducky { get; set; }
 
-			set { _ducky = value; }
-		}
+		public bool Checked { get; set; }
 
-		public bool Checked
-		{
-			get { return _checked; }
+		public string KeyFile { get; set; }
 
-			set { _checked = value; }
-		}
+		public string KeyContainer { get; set; }
 
-		public string KeyFile
-		{
-			get { return _keyFile; }
+		public bool DelaySign { get; set; }
 
-			set { _keyFile = value; }
-		}
-
-		public string KeyContainer
-		{
-			get { return _keyContainer; }
-
-			set { _keyContainer = value; }
-		}
-
-		public bool DelaySign
-		{
-			get { return _delaySign; }
-
-			set { _delaySign = value; }
-		}
-		
-		public bool WhiteSpaceAgnostic
-		{
-			get { return _whiteSpaceAgnostic; }
-			set { _whiteSpaceAgnostic = value; }
-		}
+		public bool WhiteSpaceAgnostic { get; set; }
 
 		public Dictionary<string, string> Defines
 		{
@@ -597,57 +516,31 @@ namespace Boo.Lang.Compiler
 			}
 		}
 
-		internal TraceSwitch TraceSwitch
-		{
-			get { return _traceSwitch; }
-			set
-			{
-				if (null == _traceSwitch)
-					_traceSwitch = value;
-			}
-		}
-
 		public bool TraceInfo
 		{
-			get { return (null != _traceSwitch && _traceSwitch.TraceInfo); }
+			get { return TraceLevel >= TraceLevel.Info; }
 		}
 
 		public bool TraceWarning
 		{
-			get { return (null != _traceSwitch && _traceSwitch.TraceWarning); }
+			get { return TraceLevel >= TraceLevel.Warning; }
 		}
 
 		public bool TraceError
 		{
-			get { return (null != _traceSwitch && _traceSwitch.TraceError); }
+			get { return TraceLevel >= TraceLevel.Error; }
 		}
 
 		public bool TraceVerbose
 		{
-			get { return (null != _traceSwitch && _traceSwitch.TraceVerbose); }
+			get { return TraceLevel >= TraceLevel.Verbose; }
 		}
 
-		public TraceLevel TraceLevel
-		{
-			get {
-				return (null != _traceSwitch)
-							? _traceSwitch.Level : TraceLevel.Off;
-			}
-			set {
-				EnableTraceSwitch();
-				_traceSwitch.Level = value;
-			}
-		}
-
-		public void EnableTraceSwitch()
-		{
-			if (null == _traceSwitch)
-				_traceSwitch = new TraceSwitch("booc", "boo compiler");
-		}
+		public TraceLevel TraceLevel { get; set; }
 		
 		private void ReadDefaultVisibilitySettings()
 		{
-			string visibility = null;
+			string visibility;
 
 			if (_defines.TryGetValue("DEFAULT_TYPE_VISIBILITY", out visibility))
 				DefaultTypeVisibility = ParseVisibility(visibility);
@@ -687,22 +580,12 @@ namespace Boo.Lang.Compiler
 			throw new ArgumentException("visibility", String.Format("Invalid visibility: '{0}'", visibility));
 		}
 
-		bool _noWarn = false;
-		bool _warnAsError = false;
 		Util.Set<string> _disabledWarnings = new Util.Set<string>();
 		Util.Set<string> _promotedWarnings = new Util.Set<string>();
 
-		public bool NoWarn
-		{
-			get { return _noWarn; }
-			set { _noWarn = value; }
-		}
+		public bool NoWarn { get; set; }
 
-		public bool WarnAsError
-		{
-			get { return _warnAsError; }
-			set { _warnAsError = value; }
-		}
+		public bool WarnAsError { get; set; }
 
 		public ICollection<string> DisabledWarnings
 		{
@@ -727,7 +610,7 @@ namespace Boo.Lang.Compiler
 
 		public void ResetWarnings()
 		{
-			_noWarn = false;
+			NoWarn = false;
 			_disabledWarnings.Clear();
 			Strict = _strict;
 		}
@@ -745,7 +628,7 @@ namespace Boo.Lang.Compiler
 
 		public void ResetWarningsAsErrors()
 		{
-			_warnAsError = false;
+			WarnAsError = false;
 			_promotedWarnings.Clear();
 		}
 
@@ -755,52 +638,45 @@ namespace Boo.Lang.Compiler
 			set {
 				_strict = value;
 				if (_strict)
-				{
-					/*strict mode*/
-					_defaultTypeVisibility = TypeMemberModifiers.Private;
-					_defaultMethodVisibility = TypeMemberModifiers.Private;
-					_defaultPropertyVisibility = TypeMemberModifiers.Private;
-					_defaultEventVisibility = TypeMemberModifiers.Private;
-					_defaultFieldVisibility = TypeMemberModifiers.Private;
-
-                    EnableWarning(CompilerWarningFactory.Codes.ImplicitReturn);
-                    EnableWarning(CompilerWarningFactory.Codes.VisibleMemberDoesNotDeclareTypeExplicitely);
-					DisableWarning(CompilerWarningFactory.Codes.ImplicitDowncast);
-                   //by default strict mode forbids implicit downcasts
-                   //disable warning so we get only the regular incompatible type error
-				}
+					OnStrictMode();
 				else
-				{
-					/*default mode*/
-					_defaultTypeVisibility = TypeMemberModifiers.Public;
-					_defaultMethodVisibility = TypeMemberModifiers.Public;
-					_defaultPropertyVisibility = TypeMemberModifiers.Public;
-					_defaultEventVisibility = TypeMemberModifiers.Public;
-					_defaultFieldVisibility = TypeMemberModifiers.Protected;
-
-                    DisableWarning(CompilerWarningFactory.Codes.ImplicitReturn);
-                    DisableWarning(CompilerWarningFactory.Codes.VisibleMemberDoesNotDeclareTypeExplicitely);
-                    DisableWarning(CompilerWarningFactory.Codes.ImplicitDowncast);
-				}
+					OnNonStrictMode();
 			}
 		}
 
-		public bool Unsafe
+		protected virtual void OnNonStrictMode()
 		{
-			get { return _unsafe; }
-			set { _unsafe = value; }
+			_defaultTypeVisibility = TypeMemberModifiers.Public;
+			_defaultMethodVisibility = TypeMemberModifiers.Public;
+			_defaultPropertyVisibility = TypeMemberModifiers.Public;
+			_defaultEventVisibility = TypeMemberModifiers.Public;
+			_defaultFieldVisibility = TypeMemberModifiers.Protected;
+
+			DisableWarning(CompilerWarningFactory.Codes.ImplicitReturn);
+			DisableWarning(CompilerWarningFactory.Codes.VisibleMemberDoesNotDeclareTypeExplicitely);
+			DisableWarning(CompilerWarningFactory.Codes.ImplicitDowncast);
 		}
 
-		public string Platform
+		protected virtual void OnStrictMode()
 		{
-			get { return _platform; }
-			set { _platform = value; }
+			_defaultTypeVisibility = TypeMemberModifiers.Private;
+			_defaultMethodVisibility = TypeMemberModifiers.Private;
+			_defaultPropertyVisibility = TypeMemberModifiers.Private;
+			_defaultEventVisibility = TypeMemberModifiers.Private;
+			_defaultFieldVisibility = TypeMemberModifiers.Private;
+
+			EnableWarning(CompilerWarningFactory.Codes.ImplicitReturn);
+			EnableWarning(CompilerWarningFactory.Codes.VisibleMemberDoesNotDeclareTypeExplicitely);
+
+			//by default strict mode forbids implicit downcasts
+			//disable warning so we get only the regular incompatible type error
+			DisableWarning(CompilerWarningFactory.Codes.ImplicitDowncast);
 		}
 
-		public IEnvironment Environment
-		{
-			get;
-			set;
-		}
+		public bool Unsafe { get; set; }
+
+		public string Platform { get; set; }
+
+		public IEnvironment Environment { get; set; }
 	}
 }

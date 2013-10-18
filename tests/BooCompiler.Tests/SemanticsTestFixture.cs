@@ -13,6 +13,7 @@ namespace BooCompiler.Tests
 			return new CompileToBoo();
 		}
 
+
 		[Test]
 		public void abstract_method0()
 		{
@@ -269,6 +270,12 @@ namespace BooCompiler.Tests
 		public void omitted_target_1()
 		{
 			RunCompilerTestCase(@"omitted-target-1.boo");
+		}
+		
+		[Test]
+		public void regex_is_cached_in_static_field_unless_assigned()
+		{
+			RunCompilerTestCase(@"regex-is-cached-in-static-field-unless-assigned.boo");
 		}
 		
 		[Test]

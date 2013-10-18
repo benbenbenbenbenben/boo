@@ -1,4 +1,4 @@
-﻿#region license
+#region license
 // Copyright (c) 2004, Rodrigo B. de Oliveira (rbo@acm.org)
 // All rights reserved.
 //
@@ -30,12 +30,8 @@
 // Arron Washington
 // Ian MacLean (original C# version)
 
-import System.Reflection;
-import System.Security;
-import System.Security.Permissions;
-[assembly: ReflectionPermission(SecurityAction.RequestMinimum,
-								ReflectionEmit: true,
-								TypeInformation: true)]
+import System.Reflection
+
 [assembly: AssemblyTitle("Boo CodeDom")]
 [assembly: AssemblyDescription("An implementation of System.CodeDom for Boo.")]
 [assembly: AssemblyConfiguration("")]
@@ -43,5 +39,4 @@ import System.Security.Permissions;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: AssemblyDelaySign(false)]
-[assembly: AssemblyVersion("2.0.9.4")]
-[assembly: AllowPartiallyTrustedCallers]
+[assembly: AssemblyVersion("2.0.9.5")]

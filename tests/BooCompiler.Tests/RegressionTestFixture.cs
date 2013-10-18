@@ -7,6 +7,7 @@ namespace BooCompiler.Tests
 	public class RegressionTestFixture : AbstractCompilerTestCase
 	{
 
+
 		[Test]
 		public void array_ldelem()
 		{
@@ -241,7 +242,7 @@ namespace BooCompiler.Tests
 			RunCompilerTestCase(@"BOO-1147-1.boo");
 		}
 		
-		[Ignore("Boo's SRE of generic base type constraint of constraint's declaring type does not work on MS.NET (2.0 at least)")][Test]
+		[Test]
 		public void BOO_1147_2()
 		{
 			RunCompilerTestCase(@"BOO-1147-2.boo");
@@ -1154,12 +1155,6 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
-		public void BOO_831_1()
-		{
-			RunCompilerTestCase(@"BOO-831-1.boo");
-		}
-		
-		[Test]
 		public void BOO_835_1()
 		{
 			RunCompilerTestCase(@"BOO-835-1.boo");
@@ -1400,6 +1395,12 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void duck_default_setter_overload()
+		{
+			RunCompilerTestCase(@"duck-default-setter-overload.boo");
+		}
+		
+		[Test]
 		public void for_re_Split()
 		{
 			RunCompilerTestCase(@"for-re-Split.boo");
@@ -1409,6 +1410,12 @@ namespace BooCompiler.Tests
 		public void generators_1()
 		{
 			RunCompilerTestCase(@"generators-1.boo");
+		}
+		
+		[Test]
+		public void method_with_type_inference_rule_as_statement()
+		{
+			RunCompilerTestCase(@"method-with-type-inference-rule-as-statement.boo");
 		}
 		
 		[Test]

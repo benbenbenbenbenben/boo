@@ -26,6 +26,8 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
+using Boo.Lang.Compiler.TypeSystem.Internal;
+
 namespace Boo.Lang.Compiler.Steps
 {
 	using System.Diagnostics;
@@ -34,11 +36,6 @@ namespace Boo.Lang.Compiler.Steps
 	
 	public class ImplementICallableOnCallableDefinitions : AbstractVisitorCompilerStep
 	{
-		override public void Run()
-		{
-			Visit(CompileUnit);
-		}
-		
 		override public void OnModule(Module node)
 		{
 			Visit(node.Members, NodeType.ClassDefinition);

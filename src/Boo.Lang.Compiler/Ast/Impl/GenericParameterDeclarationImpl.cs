@@ -76,8 +76,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			GenericParameterDeclaration other = node as GenericParameterDeclaration;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( GenericParameterDeclaration)node;
 			if (_name != other._name) return NoMatch("GenericParameterDeclaration._name");
 			if (!Node.AllMatch(_baseTypes, other._baseTypes)) return NoMatch("GenericParameterDeclaration._baseTypes");
 			if (_constraints != other._constraints) return NoMatch("GenericParameterDeclaration._constraints");
@@ -109,13 +110,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			GenericParameterDeclaration clone = (GenericParameterDeclaration)FormatterServices.GetUninitializedObject(typeof(GenericParameterDeclaration));
+		
+			GenericParameterDeclaration clone = new GenericParameterDeclaration();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._name = _name;
 			if (null != _baseTypes)
 			{
@@ -124,6 +126,8 @@ namespace Boo.Lang.Compiler.Ast
 			}
 			clone._constraints = _constraints;
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

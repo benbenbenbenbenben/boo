@@ -34,11 +34,12 @@ using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.Services;
 using Boo.Lang.Compiler.TypeSystem;
 using Boo.Lang.Compiler.TypeSystem.Builders;
+using Boo.Lang.Compiler.TypeSystem.Internal;
 using Boo.Lang.Environments;
 
 namespace Boo.Lang.Compiler.Steps
 {
-	public class ForeignReferenceCollector : DepthFirstVisitor
+	public class ForeignReferenceCollector : FastDepthFirstVisitor
 	{
 		IType _currentType;
 		

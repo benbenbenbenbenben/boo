@@ -72,8 +72,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			GenericTypeDefinitionReference other = node as GenericTypeDefinitionReference;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( GenericTypeDefinitionReference)node;
 			if (_isPointer != other._isPointer) return NoMatch("GenericTypeDefinitionReference._isPointer");
 			if (_name != other._name) return NoMatch("GenericTypeDefinitionReference._name");
 			if (_genericPlaceholders != other._genericPlaceholders) return NoMatch("GenericTypeDefinitionReference._genericPlaceholders");
@@ -93,17 +94,20 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			GenericTypeDefinitionReference clone = (GenericTypeDefinitionReference)FormatterServices.GetUninitializedObject(typeof(GenericTypeDefinitionReference));
+		
+			GenericTypeDefinitionReference clone = new GenericTypeDefinitionReference();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._isPointer = _isPointer;
 			clone._name = _name;
 			clone._genericPlaceholders = _genericPlaceholders;
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

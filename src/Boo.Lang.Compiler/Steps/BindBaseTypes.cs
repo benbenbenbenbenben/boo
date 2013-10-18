@@ -34,13 +34,8 @@ using Boo.Lang.Compiler.TypeSystem.Services;
 
 namespace Boo.Lang.Compiler.Steps
 {
-	public class BindBaseTypes : AbstractVisitorCompilerStep, ITypeMemberReifier
+	public class BindBaseTypes : AbstractFastVisitorCompilerStep, ITypeMemberReifier
 	{
-		override public void Run()
-		{
-			Visit(CompileUnit.Modules);
-		}
-		
 		override public void OnEnumDefinition(EnumDefinition node)
 		{
 		}
@@ -48,10 +43,10 @@ namespace Boo.Lang.Compiler.Steps
 		override public void OnClassDefinition(ClassDefinition node)
 		{
 			// Visit type definition's members to resolve base types on nested types
-			base.OnClassDefinition(node);
+			Visit(node.Members);
 
 			// Resolve and check base types
-			ResolveBaseTypes(new Boo.Lang.List(), node);
+			ResolveBaseTypesOf(node);
 			CheckBaseTypes(node);
 			
 			if (node.IsFinal)
@@ -60,11 +55,21 @@ namespace Boo.Lang.Compiler.Steps
 			if (((IType)node.Entity).IsFinal)
 				node.Modifiers |= TypeMemberModifiers.Final;
 		}
-		
+
+		private void ResolveBaseTypesOf(TypeDefinition node)
+		{
+			ResolveBaseTypes(new List<TypeDefinition>(), node);
+		}
+
 		override public void OnInterfaceDefinition(InterfaceDefinition node)
 		{
-			ResolveBaseTypes(new Boo.Lang.List(), node);
+			ResolveBaseTypesOf(node);
 			CheckInterfaceBaseTypes(node);
+		}
+
+		public override void OnMethod(Method node)
+		{
+			// skip method bodies
 		}
 		
 		void CheckBaseTypes(ClassDefinition node)
@@ -78,21 +83,14 @@ namespace Boo.Lang.Compiler.Steps
 
 				if (null != baseClass)
 				{
-					Error(
-					    CompilerErrorFactory.ClassAlreadyHasBaseType(baseTypeRef,
-							node.Name,
-							baseClass.FullName)
-						);
+					Error(CompilerErrorFactory.ClassAlreadyHasBaseType(baseTypeRef, node.Name, baseClass));
 					continue;
 				}
 				
 				baseClass = baseType;
 				if (baseClass.IsFinal && !TypeSystemServices.IsError(baseClass))
 				{
-					Error(
-						CompilerErrorFactory.CannotExtendFinalType(
-							baseTypeRef,
-							baseClass.FullName));
+					Error(CompilerErrorFactory.CannotExtendFinalType(baseTypeRef, baseClass));
 				}
 			}
 			
@@ -102,17 +100,15 @@ namespace Boo.Lang.Compiler.Steps
 		
 		void CheckInterfaceBaseTypes(InterfaceDefinition node)
 		{
-			foreach (TypeReference baseType in node.BaseTypes)
+			foreach (var baseTypeRef in node.BaseTypes)
 			{
-				IType tag = GetType(baseType);
-				if (!tag.IsInterface)
-				{
-					Error(CompilerErrorFactory.InterfaceCanOnlyInheritFromInterface(baseType, node.FullName, tag.FullName));
-				}
+				var baseType = GetType(baseTypeRef);
+				if (!baseType.IsInterface)
+					Error(CompilerErrorFactory.InterfaceCanOnlyInheritFromInterface(baseTypeRef, GetType(node), baseType));
 			}
 		}
 
-		void ResolveBaseTypes(Boo.Lang.List visited, TypeDefinition node)
+		void ResolveBaseTypes(List<TypeDefinition> visited, TypeDefinition node)
 		{
 			new BaseTypeResolution(Context, node, visited);
 		}

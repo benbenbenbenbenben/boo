@@ -1,4 +1,4 @@
-﻿#region license
+#region license
 // Copyright (c) 2004, Rodrigo B. de Oliveira (rbo@acm.org)
 // All rights reserved.
 // 
@@ -26,12 +26,8 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-import System.Reflection;
-import System.Security.Permissions;
-import System.Security;
+import System.Reflection
 
-[assembly: ReflectionPermission(SecurityAction.RequestMinimum,
-								ReflectionEmit: true)]
 [assembly: AssemblyTitle("Boo Compiler Extensions")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
@@ -40,6 +36,4 @@ import System.Security;
 [assembly: AssemblyCopyright("(C) 2003-2007 Rodrigo Barreto de Oliveira")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyVersion("2.0.9.4")]
-[assembly: AllowPartiallyTrustedCallers]
-
+[assembly: AssemblyVersion("2.0.9.5")]

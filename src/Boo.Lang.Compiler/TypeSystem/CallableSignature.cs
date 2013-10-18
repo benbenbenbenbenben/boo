@@ -114,10 +114,10 @@ namespace Boo.Lang.Compiler.TypeSystem
 				if (i > 0) { buffer.Append(", "); }
 				if (_parameters[i].IsByRef) buffer.Append("ref ");
 				if (_acceptVarArgs && i == _parameters.Length-1) buffer.Append('*');
-				buffer.Append(_parameters[i].Type.ToString());
+				buffer.Append(_parameters[i].Type.DisplayName());
 			}
 			buffer.Append(") as ");
-			buffer.Append(_returnType.ToString());
+			buffer.Append(_returnType.DisplayName());
 			return buffer.ToString();
 		}
 
@@ -145,13 +145,10 @@ namespace Boo.Lang.Compiler.TypeSystem
 		void InitializeHashCode()
 		{
 			_hashCode = _acceptVarArgs ? 1 : 2;
-			foreach (IParameter parameter in _parameters)
-			{
+			foreach (var parameter in _parameters)
 				_hashCode ^= parameter.Type.GetHashCode();
-			}
 			_hashCode ^= _returnType.GetHashCode();
 		}
-
 	}
 
 }

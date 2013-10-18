@@ -37,7 +37,16 @@ class PatternExpander:
 	private static final Dummy = '_'
 
 	def Expand(matchValue as Expression, pattern as Expression) as Expression:
-		if pattern isa MethodInvocationExpression:
+		if mie = pattern as MethodInvocationExpression:
+			if mie.Target.ToString() == 'array':
+				lst = ArrayLiteralExpression()
+				for arg in mie.Arguments:
+					lst.Items.Add(arg)
+		
+				temp = NewTemp(matchValue) 
+				condition = [| $temp = $matchValue as (object) |]
+				return [| $condition and $(ExpandFixedSizePattern(temp, lst)) |]
+
 			return ExpandObjectPattern(matchValue, pattern)
 				
 		if pattern isa MemberReferenceExpression:
@@ -216,6 +225,9 @@ class PatternExpander:
 		override def OnTryCastExpression(node as TryCastExpression):
 			Push node, [| $Ast.TryCastExpression(Target: $(Expand(node.Target)), Type: $(Expand(node.Type))) |]
 			
+		override def OnCastExpression(node as CastExpression):
+			Push node, [| $Ast.CastExpression(Target: $(Expand(node.Target)), Type: $(Expand(node.Type))) |]
+			
 		override def OnMethodInvocationExpression(node as MethodInvocationExpression):
 			if len(node.Arguments) > 0:
 				pattern = [| $Ast.MethodInvocationExpression(Target: $(Expand(node.Target)), Arguments: $(ExpandFixedSize(node.Arguments))) |]
@@ -225,6 +237,9 @@ class PatternExpander:
 			
 		override def OnTypeofExpression(node as TypeofExpression):
 			Push node, [| $Ast.TypeofExpression(Type: $(Expand(node.Type))) |]
+			
+		override def OnListLiteralExpression(node as ListLiteralExpression):
+			Push node, [| $Ast.ListLiteralExpression(Items: $(ExpandFixedSize(node.Items))) |]
 			
 		override def OnBoolLiteralExpression(node as BoolLiteralExpression):
 			Push node, [| $Ast.BoolLiteralExpression(Value: $node) |]
@@ -239,10 +254,10 @@ class PatternExpander:
 			Push node, [| $Ast.NullLiteralExpression() |]
 			
 		override def OnUnaryExpression(node as UnaryExpression):
-			Push node, [| $Ast.UnaryExpression(Operator: UnaryOperatorType.$(node.Operator.ToString()), Operand: $(Expand(node.Operand))) |]
+			Push node, [| $Ast.UnaryExpression(Operator: $Ast.UnaryOperatorType.$(node.Operator.ToString()), Operand: $(Expand(node.Operand))) |]
 			
 		override def OnBinaryExpression(node as BinaryExpression):
-			Push node, [| $Ast.BinaryExpression(Operator: BinaryOperatorType.$(node.Operator.ToString()), Left: $(Expand(node.Left)), Right: $(Expand(node.Right))) |]
+			Push node, [| $Ast.BinaryExpression(Operator: $Ast.BinaryOperatorType.$(node.Operator.ToString()), Left: $(Expand(node.Left)), Right: $(Expand(node.Right))) |]
 		
 		override def OnReferenceExpression(node as ReferenceExpression):
 			Push node, [| $Ast.ReferenceExpression(Name: $(node.Name)) |]
@@ -256,6 +271,14 @@ class PatternExpander:
 		override def OnMemberReferenceExpression(node as MemberReferenceExpression):
 			Push node, [| $Ast.MemberReferenceExpression(Target: $(Expand(node.Target)), Name: $(node.Name)) |] 
 			
+		override def OnGenericReferenceExpression(node as GenericReferenceExpression):
+			Push node, [| $Ast.GenericReferenceExpression(Target: $(Expand(node.Target)), GenericArguments: $(ExpandFixedSize(node.GenericArguments))) |]
+			
+		override def OnSimpleTypeReference(node as SimpleTypeReference):
+			Push node, [| $Ast.SimpleTypeReference(Name: $(node.Name)) |]
+			
+		override def OnGenericTypeReference(node as GenericTypeReference):
+			Push node, [| $Ast.GenericTypeReference(Name: $(node.Name), GenericArguments: $(ExpandFixedSize(node.GenericArguments))) |]
 		
 	def ObjectPatternFor(node as QuasiquoteExpression):
 		return QuasiquotePatternBuilder(self).Build(node)
@@ -264,16 +287,24 @@ class PatternExpander:
 		return ExpandObjectPattern(matchValue, ObjectPatternFor(node))
 		
 	def ExpandMemberPattern(matchValue as Expression, member as ExpressionPair):
-		memberRef = MemberReferenceExpression(member.First.LexicalInfo, matchValue, member.First.ToString())	
+		memberRef = ExpandMemberReference(member.First, matchValue)	
 		return Expand(memberRef, member.Second)
+		
+	def ExpandMemberReference(member as Expression, target as Expression) as Expression:
+		memberRef = member as MemberReferenceExpression
+		if memberRef is not null:
+			return MemberReferenceExpression(member.LexicalInfo, ExpandMemberReference(memberRef.Target, target), memberRef.Name)
+		return MemberReferenceExpression(member.LexicalInfo, target, member.ToString())
 		
 	def ExpandFixedSizePattern(matchValue as Expression, pattern as ArrayLiteralExpression):
 		patternLen = len(pattern.Items)
 		condition = [| $(patternLen) == len($matchValue) |]
 
+		if patternLen == 0: return condition
+
 		if IsCatchAllPattern(last = pattern.Items[patternLen-1]):
 			pattern.Items.Remove(last)
-			condition = [| $(patternLen) <= len($matchValue)+1 |]
+			condition = [| $(patternLen-1) <= len($matchValue) |]
 
 		i = 0
 		for item in pattern.Items:

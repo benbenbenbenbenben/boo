@@ -76,8 +76,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			Attribute other = node as Attribute;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( Attribute)node;
 			if (_name != other._name) return NoMatch("Attribute._name");
 			if (!Node.AllMatch(_arguments, other._arguments)) return NoMatch("Attribute._arguments");
 			if (!Node.AllMatch(_namedArguments, other._namedArguments)) return NoMatch("Attribute._namedArguments");
@@ -121,13 +122,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			Attribute clone = (Attribute)FormatterServices.GetUninitializedObject(typeof(Attribute));
+		
+			Attribute clone = new Attribute();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._name = _name;
 			if (null != _arguments)
 			{
@@ -140,6 +142,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._namedArguments.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

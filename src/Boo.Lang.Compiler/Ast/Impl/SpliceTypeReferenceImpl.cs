@@ -72,8 +72,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			SpliceTypeReference other = node as SpliceTypeReference;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( SpliceTypeReference)node;
 			if (_isPointer != other._isPointer) return NoMatch("SpliceTypeReference._isPointer");
 			if (!Node.Matches(_expression, other._expression)) return NoMatch("SpliceTypeReference._expression");
 			return true;
@@ -97,13 +98,14 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			SpliceTypeReference clone = (SpliceTypeReference)FormatterServices.GetUninitializedObject(typeof(SpliceTypeReference));
+		
+			SpliceTypeReference clone = new SpliceTypeReference();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._isPointer = _isPointer;
 			if (null != _expression)
 			{
@@ -111,6 +113,8 @@ namespace Boo.Lang.Compiler.Ast
 				clone._expression.InitializeParent(clone);
 			}
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

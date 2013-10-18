@@ -26,7 +26,7 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-
+using System;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.TypeSystem;
 
@@ -45,10 +45,6 @@ namespace Boo.Lang.Compiler.Steps
 		protected IMethod RuntimeServices_SetSlice;
 		protected IMethod RuntimeServices_GetSlice;
 		protected IType _duckTypingServicesType;
-		
-		public ExpandDuckTypedExpressions()
-		{
-		}
 
 		public override void Initialize(CompilerContext context)
 		{
@@ -108,10 +104,9 @@ namespace Boo.Lang.Compiler.Steps
 
 		public override void Run()
 		{
-			if (0 == Errors.Count)
-			{
-				Visit(CompileUnit);
-			}
+			if (Errors.Count > 0)
+				return;
+			Visit(CompileUnit);
 		}
 
 		override public void OnMethodInvocationExpression(MethodInvocationExpression node)
@@ -150,8 +145,8 @@ namespace Boo.Lang.Compiler.Steps
 
 		override public void LeaveSlicingExpression(SlicingExpression node)
 		{
-			if (!TypeSystemServices.IsDuckTyped(node.Target)) return;
-			if (AstUtil.IsLhsOfAssignment(node)) return;
+			if (!IsDuckTyped(node.Target)) return;
+			if (node.IsTargetOfAssignment()) return;
 
 			// todo
 			// a[foo]
@@ -165,6 +160,11 @@ namespace Boo.Lang.Compiler.Steps
 				GetArrayForIndices(node));
 			
 			Replace(mie);
+		}
+
+		private bool IsDuckTyped(Expression e)
+		{
+			return TypeSystemServices.IsDuckTyped(e);
 		}
 
 		private static string GetSlicingMemberName(SlicingExpression node)
@@ -190,22 +190,16 @@ namespace Boo.Lang.Compiler.Steps
 
 		private ArrayLiteralExpression GetArrayForIndices(SlicingExpression node)
 		{
-			ArrayLiteralExpression args = new ArrayLiteralExpression();
-			foreach (Slice index in node.Indices)
-			{
-				if (AstUtil.IsComplexSlice(index))
-				{
-					throw CompilerErrorFactory.NotImplemented(index, "complex slice for duck");
-				}
+			var args = new ArrayLiteralExpression();
+			foreach (var index in node.Indices)
 				args.Items.Add(index.Begin);
-			}
 			BindExpressionType(args, TypeSystemServices.ObjectArrayType);
 			return args;
 		}
 
 		override public void LeaveUnaryExpression(UnaryExpression node)
 		{
-			if (TypeSystemServices.IsDuckTyped(node.Operand) &&
+			if (IsDuckTyped(node.Operand) &&
 				node.Operator == UnaryOperatorType.UnaryNegation)
 			{
 				MethodInvocationExpression mie = CodeBuilder.CreateMethodInvocation(
@@ -227,39 +221,38 @@ namespace Boo.Lang.Compiler.Steps
 				return;
 			}
 
-			if (!AstUtil.IsOverloadableOperator(node.Operator)) return;
-			if (!TypeSystemServices.IsDuckTyped(node.Left) && !TypeSystemServices.IsDuckTyped(node.Right)) return;
+			if (!AstUtil.IsOverloadableOperator(node.Operator))
+				return;
 
-			MethodInvocationExpression mie = CodeBuilder.CreateMethodInvocation(
+			if (!IsDuckTyped(node.Left) && !IsDuckTyped(node.Right))
+				return;
+
+			var mie = CodeBuilder.CreateMethodInvocation(
 				node.LexicalInfo,
 				RuntimeServices_InvokeBinaryOperator,
-				CodeBuilder.CreateStringLiteral(
-				AstUtil.GetMethodNameForOperator(node.Operator)),
+				CodeBuilder.CreateStringLiteral(AstUtil.GetMethodNameForOperator(node.Operator)),
 				node.Left, node.Right);
+
 			Replace(mie);
 		}
 
 		private void ProcessAssignment(BinaryExpression node)
 		{
-			if (NodeType.SlicingExpression == node.Left.NodeType)
+			var slice = node.Left as SlicingExpression;
+			if (slice != null)
 			{
-				SlicingExpression slice = (SlicingExpression)node.Left;
-				if (TypeSystemServices.IsDuckTyped(slice.Target))
-				{
-					ProcessDuckSlicingPropertySet(node);
-				}
+				if (IsDuckTyped(slice.Target)) ProcessDuckSlicingPropertySet(node);
+				return;
 			}
-			else if (TypeSystemServices.IsQuackBuiltin(node.Left))
-			{
+			if (TypeSystemServices.IsQuackBuiltin(node.Left))
 				ProcessQuackPropertySet(node);
-			}
 		}
 
 		override public void LeaveMemberReferenceExpression(MemberReferenceExpression node)
 		{
 			if (!TypeSystemServices.IsQuackBuiltin(node)) return;
 			
-			if (AstUtil.IsLhsOfAssignment(node)
+			if (node.IsTargetOfAssignment()
 				|| AstUtil.IsTargetOfSlicing(node)) return;
 
 			MethodInvocationExpression mie = CodeBuilder.CreateMethodInvocation(
@@ -272,12 +265,14 @@ namespace Boo.Lang.Compiler.Steps
 
 		void ProcessDuckSlicingPropertySet(BinaryExpression node)
 		{
-			SlicingExpression slice = (SlicingExpression)node.Left;
+			var slice = (SlicingExpression)node.Left;
+			if (slice.IsComplexSlicing())
+				throw CompilerErrorFactory.NotImplemented(slice, "complex slicing for duck");
 
-			ArrayLiteralExpression args = GetArrayForIndices(slice);
+			var args = GetArrayForIndices(slice);
 			args.Items.Add(node.Right);
 			
-			MethodInvocationExpression mie = CodeBuilder.CreateMethodInvocation(
+			var mie = CodeBuilder.CreateMethodInvocation(
 				node.LexicalInfo,
 				RuntimeServices_SetSlice,
 				GetSlicingTarget(slice),

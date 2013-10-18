@@ -59,7 +59,7 @@ namespace Boo.Lang.Compiler.Steps.Generators
 		
 		Field _externalEnumeratorSelf;
 
-		readonly List _labels;
+		readonly List<LabelStatement> _labels;
 
 		readonly System.Collections.Generic.List<TryStatementInfo> _tryStatementInfoForLabels = new System.Collections.Generic.List<TryStatementInfo>();
 
@@ -71,11 +71,11 @@ namespace Boo.Lang.Compiler.Steps.Generators
 
 		public GeneratorMethodProcessor(CompilerContext context, InternalMethod method)
 		{
-			_labels = new List();
+			_labels = new List<LabelStatement>();
 			_mapping = new Hashtable();
 			_generator = method;
 
-			GeneratorSkeleton skeleton = My<GeneratorSkeletonBuilder>.Instance.SkeletonFor(method);
+			var skeleton = My<GeneratorSkeletonBuilder>.Instance.SkeletonFor(method);
 			_generatorItemType = skeleton.GeneratorItemType;
 			_enumerable = skeleton.GeneratorClassBuilder;
 			_getEnumeratorBuilder = skeleton.GetEnumeratorBuilder;
@@ -92,8 +92,8 @@ namespace Boo.Lang.Compiler.Steps.Generators
 		{
 			CreateEnumerableConstructor();
 			CreateEnumerator();
-			MethodInvocationExpression enumerableConstructorInvocation = CodeBuilder.CreateConstructorInvocation(_enumerable.ClassDefinition);
-			MethodInvocationExpression enumeratorConstructorInvocation = CodeBuilder.CreateConstructorInvocation(_enumerator.ClassDefinition);
+			var enumerableConstructorInvocation = CodeBuilder.CreateConstructorInvocation(_enumerable.ClassDefinition);
+			var enumeratorConstructorInvocation = CodeBuilder.CreateConstructorInvocation(_enumerator.ClassDefinition);
 			PropagateReferences(enumerableConstructorInvocation, enumeratorConstructorInvocation);
 			CreateGetEnumeratorBody(enumeratorConstructorInvocation);
 			FixGeneratorMethodBody(enumerableConstructorInvocation);
@@ -101,7 +101,7 @@ namespace Boo.Lang.Compiler.Steps.Generators
 		
 		void FixGeneratorMethodBody(MethodInvocationExpression enumerableConstructorInvocation)
 		{
-			Block body = _generator.Method.Body;
+			var body = _generator.Method.Body;
 			body.Clear();
 
 			body.Add(
@@ -181,8 +181,8 @@ namespace Boo.Lang.Compiler.Steps.Generators
 		
 		void CreateEnumerator()
 		{
-			IType abstractEnumeratorType =
-				TypeSystemServices.Map(typeof(Boo.Lang.GenericGeneratorEnumerator<>)).
+			var abstractEnumeratorType =
+				TypeSystemServices.Map(typeof(GenericGeneratorEnumerator<>)).
 					GenericInfo.ConstructType(new IType[] {_generatorItemType});
 			
 			_state = NameResolutionService.ResolveField(abstractEnumeratorType, "_state");
@@ -191,7 +191,7 @@ namespace Boo.Lang.Compiler.Steps.Generators
 			
 			_enumerator = CodeBuilder.CreateClass("$");
 			_enumerator.AddAttribute(CodeBuilder.CreateAttribute(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)));
-			_enumerator.Modifiers |= TypeMemberModifiers.Final;
+			_enumerator.Modifiers |= _enumerable.Modifiers;
 			_enumerator.LexicalInfo = this.LexicalInfo;
 			_enumerator.AddBaseType(abstractEnumeratorType);
 			_enumerator.AddBaseType(TypeSystemServices.IEnumeratorType);

@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="3.5">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -13,29 +13,7 @@
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\boo.snk</AssemblyOriginatorKeyFile>
     <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
-    <NoStdLib>False</NoStdLib>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <FileUpgradeFlags>
-    </FileUpgradeFlags>
-    <OldToolsVersion>2.0</OldToolsVersion>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
-    <UpgradeBackupLocation>
-    </UpgradeBackupLocation>
-    <PublishUrl>publish\</PublishUrl>
-    <Install>true</Install>
-    <InstallFrom>Disk</InstallFrom>
-    <UpdateEnabled>false</UpdateEnabled>
-    <UpdateMode>Foreground</UpdateMode>
-    <UpdateInterval>7</UpdateInterval>
-    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
-    <UpdatePeriodically>false</UpdatePeriodically>
-    <UpdateRequired>false</UpdateRequired>
-    <MapFileExtensions>true</MapFileExtensions>
-    <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
-    <UseApplicationTrust>false</UseApplicationTrust>
-    <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -92,6 +70,10 @@
     <ErrorReport>prompt</ErrorReport>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include='System'/>
+    <Reference Include='System.Core'/>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="AbstractGenerator.cs" />
     <Compile Include="AbstractGeneratorEnumerator.cs" />
     <Compile Include="AssemblyInfo.cs" />
@@ -105,13 +87,12 @@
     <Compile Include="Environments\CachingEnvironment.cs" />
     <Compile Include="Environments\ClosedEnvironment.cs" />
     <Compile Include="Environments\DeferredEnvironment.cs" />
+    <Compile Include="Environments\EnvironmentBoundValue.cs" />
     <Compile Include="Environments\EnvironmentChain.cs" />
-    <Compile Include="Environments\EnvironmentExtensions.cs" />
     <Compile Include="Environments\EnvironmentProvision.cs" />
     <Compile Include="Environments\IEnvironment.cs" />
     <Compile Include="Environments\InstantiatingEnvironment.cs" />
     <Compile Include="Environments\My.cs" />
-    <Compile Include="ExtensionAttribute.cs" />
     <Compile Include="GenericGenerator.cs" />
     <Compile Include="GenericGeneratorEnumerator.cs" />
     <Compile Include="GenericList.cs" />
@@ -123,8 +104,10 @@
     <Compile Include="List.cs" />
     <Compile Include="MetaAttribute.cs" />
     <Compile Include="ModuleAttribute.cs" />
+    <Compile Include="Procedure.cs" />
     <Compile Include="QuackFuMember.cs" />
     <Compile Include="ResourceManager.cs" />
+    <Compile Include="Resources\StringResources.cs" />
     <Compile Include="Runtime\AssertionFailedException.cs" />
     <Compile Include="Runtime\CandidateMethod.cs" />
     <Compile Include="Runtime\DynamicDispatching\AbstractDispatcherFactory.cs" />
@@ -145,21 +128,11 @@
     <Compile Include="Runtime\ExtensionRegistry.cs" />
     <Compile Include="Runtime\ICoercible.cs" />
     <Compile Include="Runtime\MethodResolver.cs" />
-    <Compile Include="Runtime\Methods.cs" />
     <Compile Include="Runtime\NumericTypes.cs" />
-    <Compile Include="Runtime\Properties.cs" />
     <Compile Include="Runtime\RuntimeException.cs" />
     <Compile Include="Runtime\RuntimeServices.cs" />
     <Compile Include="Runtime\TextReaderEnumerator.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Resources\strings.resx">
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
+    <Compile Include="TypeInferenceRuleAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="boo.snk" />

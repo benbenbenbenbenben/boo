@@ -26,147 +26,59 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-using Boo.Lang.Compiler.TypeSystem.Internal;
+using Boo.Lang.Compiler.Ast;
 
-namespace Boo.Lang.Compiler.TypeSystem
+namespace Boo.Lang.Compiler.TypeSystem.Internal
 {
-	using Boo.Lang.Compiler.Ast;
-
 	public class InternalProperty : InternalEntity<Property>, IProperty
 	{
-		private InternalTypeSystemProvider _provider;
-		
+		private readonly InternalTypeSystemProvider _provider;
 		private IParameter[] _parameters;
-		
-		private IProperty _override;
-
-		private bool? _isBooExtension;
-		private bool? _isClrExtension;
 
 		public InternalProperty(InternalTypeSystemProvider provider, Property property) : base(property)
 		{
 			_provider = provider;
 		}
-
-		public bool IsExtension
-		{
-			get
-			{
-				return IsBooExtension || IsClrExtension;
-			}
-		}
-
-		public bool IsBooExtension
-		{
-			get
-			{
-				if (null == _isBooExtension)
-				{
-					_isBooExtension = IsAttributeDefined(Types.BooExtensionAttribute);
-				}
-				return _isBooExtension.Value;
-			}
-		}
-
-		public bool IsClrExtension
-		{
-			get
-			{
-				if (null == _isClrExtension)
-				{
-					_isClrExtension = MetadataUtil.HasClrExtensions()
-							&& IsStatic
-							&& IsAttributeDefined(Types.ClrExtensionAttribute);
-				}
-				return _isClrExtension.Value;
-			}
-		}
-
-		private bool IsAttributeDefined(System.Type attributeType)
-		{
-			return MetadataUtil.IsAttributeDefined(_node, _provider.Map(attributeType));
-		}
 		
 		override public EntityType EntityType
 		{
-			get
-			{
-				return EntityType.Property;
-			}
+			get { return EntityType.Property; }
 		}
 		
 		public IType Type
 		{
-			get
-			{
-				return null != _node.Type 
-					? TypeSystemServices.GetType(_node.Type)
-					: Unknown.Default;
-			}
+			get { return _node.Type != null  ? TypeSystemServices.GetType(_node.Type) : Unknown.Default; }
 		}
 
 		public bool AcceptVarArgs
 		{
-			get
-			{
-				return false;
-			}
+			get { return false; }
 		}
 		
 		public IParameter[] GetParameters()
 		{
-			if (null == _parameters)
-			{
-				_parameters = _provider.Map(_node.Parameters);				
-			}
-			return _parameters;
+			return _parameters ?? (_parameters = _provider.Map(_node.Parameters));
 		}
-		
-		public IProperty Override
-		{
-			get
-			{
-				return _override;
-			}
-			
-			set
-			{
-				_override = value;
-			}
-		}
+
+		public IProperty Overriden { get; set; }
 
 		public IMethod GetGetMethod()
 		{
-			if (null != _node.Getter)
-			{
+			if (_node.Getter != null)
 				return (IMethod)TypeSystemServices.GetEntity(_node.Getter);
-			}
-			if (null != _override)
-			{
-				return _override.GetGetMethod();
-			}
-			return null;
+			return Overriden != null ? Overriden.GetGetMethod() : null;
 		}
 		
 		public IMethod GetSetMethod()
 		{
-			if (null != _node.Setter)
-			{
+			if (_node.Setter != null)
 				return (IMethod)TypeSystemServices.GetEntity(_node.Setter);
-			}
-			if (null != _override)
-			{
-				return _override.GetSetMethod();
-			}
-			return null;
+			return Overriden != null ? Overriden.GetSetMethod() : null;
 		}
 
 		public Property Property
 		{
-			get
-			{
-				return _node;
-			}
+			get { return _node; }
 		}
 		
 		override public string ToString()
@@ -176,11 +88,7 @@ namespace Boo.Lang.Compiler.TypeSystem
 
 		public bool IsDuckTyped
 		{
-			get
-			{
-				return this.Type == _provider.DuckType 
-					|| _node.Attributes.Contains("Boo.Lang.DuckTypedAttribute");
-			}
+			get { return Type == _provider.DuckType || _node.Attributes.Contains("Boo.Lang.DuckTypedAttribute"); }
 		}
 	}
 }

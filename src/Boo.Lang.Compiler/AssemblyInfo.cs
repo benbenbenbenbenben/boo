@@ -1,4 +1,4 @@
-﻿#region license
+#region license
 // Copyright (c) 2004, Rodrigo B. de Oliveira (rbo@acm.org)
 // All rights reserved.
 // 
@@ -27,8 +27,8 @@
 #endregion
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security;
-using System.Security.Permissions;
 
 [assembly: AssemblyTitle("boo - an extensible programming language for the CLI")]
 [assembly: AssemblyDescription("")]
@@ -38,10 +38,5 @@ using System.Security.Permissions;
 [assembly: AssemblyCopyright("(C) 2003-2007 Rodrigo Barreto de Oliveira")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyVersion("2.0.9.4")]
+[assembly: AssemblyVersion("2.0.9.5")]
 [assembly: AssemblyDelaySign(false)]
-[assembly: AllowPartiallyTrustedCallers]
-
-#if (NET_4_0)
-[assembly: SecurityRules(SecurityRuleSet.Level1)]
-#endif

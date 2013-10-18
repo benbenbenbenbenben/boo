@@ -74,8 +74,9 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public bool Matches(Node node)
 		{	
-			DoubleLiteralExpression other = node as DoubleLiteralExpression;
-			if (null == other) return false;
+			if (node == null) return false;
+			if (NodeType != node.NodeType) return false;
+			var other = ( DoubleLiteralExpression)node;
 			if (_value != other._value) return NoMatch("DoubleLiteralExpression._value");
 			if (_isSingle != other._isSingle) return NoMatch("DoubleLiteralExpression._isSingle");
 			return true;
@@ -94,17 +95,20 @@ namespace Boo.Lang.Compiler.Ast
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]
 		override public object Clone()
 		{
-			DoubleLiteralExpression clone = (DoubleLiteralExpression)FormatterServices.GetUninitializedObject(typeof(DoubleLiteralExpression));
+		
+			DoubleLiteralExpression clone = new DoubleLiteralExpression();
 			clone._lexicalInfo = _lexicalInfo;
 			clone._endSourceLocation = _endSourceLocation;
 			clone._documentation = _documentation;
+			clone._isSynthetic = _isSynthetic;
 			clone._entity = _entity;
 			if (_annotations != null) clone._annotations = (Hashtable)_annotations.Clone();
-		
 			clone._expressionType = _expressionType;
 			clone._value = _value;
 			clone._isSingle = _isSingle;
 			return clone;
+
+
 		}
 
 		[System.CodeDom.Compiler.GeneratedCodeAttribute("astgen.boo", "1")]

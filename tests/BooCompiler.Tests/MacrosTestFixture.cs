@@ -7,10 +7,17 @@ namespace BooCompiler.Tests
 	public class MacrosTestFixture : AbstractCompilerTestCase
 	{
 
+
 		[Test]
 		public void assert_1()
 		{
 			RunCompilerTestCase(@"assert-1.boo");
+		}
+		
+		[Test]
+		public void custom_class_macro_as_generic_argument()
+		{
+			RunCompilerTestCase(@"custom-class-macro-as-generic-argument.boo");
 		}
 		
 		[Test]
@@ -206,6 +213,18 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void macro_yielding_partial_enum_with_existing_partial_definition()
+		{
+			RunCompilerTestCase(@"macro-yielding-partial-enum-with-existing-partial-definition.boo");
+		}
+		
+		[Test]
+		public void macro_yielding_partial_enums()
+		{
+			RunCompilerTestCase(@"macro-yielding-partial-enums.boo");
+		}
+		
+		[Test]
 		public void member_macro_changing_all_sibling_method_bodies()
 		{
 			RunCompilerTestCase(@"member-macro-changing-all-sibling-method-bodies.boo");
@@ -302,6 +321,12 @@ namespace BooCompiler.Tests
 		}
 		
 		[Test]
+		public void preserving_1()
+		{
+			RunCompilerTestCase(@"preserving-1.boo");
+		}
+		
+		[Test]
 		public void print_1()
 		{
 			RunCompilerTestCase(@"print-1.boo");
@@ -311,6 +336,12 @@ namespace BooCompiler.Tests
 		public void print_2()
 		{
 			RunCompilerTestCase(@"print-2.boo");
+		}
+		
+		[Test]
+		public void then_can_be_used_as_macro_name()
+		{
+			RunCompilerTestCase(@"then-can-be-used-as-macro-name.boo");
 		}
 		
 		[Test]
@@ -347,6 +378,12 @@ namespace BooCompiler.Tests
 		public void using_5()
 		{
 			RunCompilerTestCase(@"using-5.boo");
+		}
+		
+		[Test]
+		public void var_1()
+		{
+			RunCompilerTestCase(@"var-1.boo");
 		}
 		
 		[Test]

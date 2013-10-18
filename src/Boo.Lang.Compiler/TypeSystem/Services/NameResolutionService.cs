@@ -28,6 +28,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.TypeSystem.Core;
 using Boo.Lang.Compiler.TypeSystem.Generics;
@@ -42,7 +43,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 	{
 		public static readonly char[] DotArray = new char[] { '.' };
 		
-		protected INamespace _global = NullNamespace.Default;
+		protected INamespace _global;
 
 		private EntityNameMatcher _entityNameMatcher = Matches;
 
@@ -56,6 +57,9 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 			_resolveExtensionFor = new MemoizedFunction<string, IType, IEntity>(StringComparer.Ordinal, ResolveExtensionFor);
 			_resolveName = new MemoizedFunction<string, EntityType, IEntity>(StringComparer.Ordinal, ResolveImpl);
 			_current.Changed += (sender, args) => ClearResolutionCache();
+
+			_global = My<GlobalNamespace>.Instance;
+			Reset();
 		}
 
 		public EntityNameMatcher EntityNameMatcher
@@ -64,7 +68,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 			set
 			{
 				if (null == value)
-                    throw new ArgumentNullException();
+					throw new ArgumentNullException();
 				_entityNameMatcher = value;
 			}
 		}
@@ -162,15 +166,15 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 
 		private void Resolve(ICollection<IEntity> targetList, string name, EntityType flags)
 		{
-			IEntity entity = My<TypeSystemServices>.Instance.ResolvePrimitive(name);
-			if (null != entity)
+			var entity = My<TypeSystemServices>.Instance.ResolvePrimitive(name);
+			if (entity != null)
 			{
 				targetList.Add(entity);
 				return;
 			}
 
 			AssertInNamespace();
-			INamespace current = CurrentNamespace;
+			var current = CurrentNamespace;
 			do
 			{
 				if (Namespaces.ResolveCoalescingNamespaces(current.ParentNamespace, current, name, flags, targetList))
@@ -336,25 +340,55 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 		{
 			if (null != node.Entity) return;
 			
-			IEntity entity = ResolveTypeName(node);
-			if (null == entity)
+			var entity = ResolveQualifiedName(node.Name, EntityType.Type);
+			
+			if (entity == null)
 			{
-				node.Entity = NameNotType(node, "not found");
+				node.Entity = NameNotType(node, null);
 				return;
 			}
-			GenericTypeReference gtr = node as GenericTypeReference;
-			if (null != gtr)
+			
+			IEntity firstCandidate = null;
+			if (entity.IsAmbiguous())
 			{
+				// Remove from the buffer types that do not match requested generity
+				var resultingSet = new Set<IEntity>(((Ambiguous)entity).Entities);
+				firstCandidate = resultingSet.First();
+				FilterGenericTypes(resultingSet, node);
+				entity = Entities.EntityFromList(resultingSet);
+			}		
+
+			if (NodeType.SimpleTypeReference == node.NodeType)
+			{
+				if (IsGenericType(entity)) {
+					firstCandidate = entity;
+					entity = null;
+				}
+				
+				if (entity == null)
+				{
+					//Generic parameters are missing because there is no candidates after filtering out generic types
+					GenericArgumentsCountMismatch(node, firstCandidate as IType);
+					node.Entity = TypeSystemServices.ErrorEntity;
+					return;
+				}
+			}
+			
+			if (NodeType.GenericTypeReference == node.NodeType)
+			{				
+				var gtr = node as GenericTypeReference;
 				entity = ResolveGenericTypeReference(gtr, entity);
 			}
 
-			GenericTypeDefinitionReference gtdr = node as GenericTypeDefinitionReference;
-			if (null != gtdr)
+			
+			if (NodeType.GenericTypeDefinitionReference == node.NodeType)
 			{
+				var gtdr = node as GenericTypeDefinitionReference;
 				IType type = (IType)entity;
 				if (gtdr.GenericPlaceholders != type.GenericInfo.GenericParameters.Length)
 				{
 					GenericArgumentsCountMismatch(gtdr, type);
+					node.Entity = TypeSystemServices.ErrorEntity;
 					return;
 				}
 			}
@@ -363,13 +397,13 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 
 			if (EntityType.Type != entity.EntityType)
 			{
-				if (EntityType.Ambiguous == entity.EntityType)
+				if (entity.IsAmbiguous())
 				{
 					entity = AmbiguousReference(node, (Ambiguous)entity);
 				}
 				else if (EntityType.Error != entity.EntityType)
 				{
-					entity = NameNotType(node, entity.ToString());
+					entity = NameNotType(node, entity);
 				}
 			}
 			else
@@ -388,7 +422,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 			var resolved = ResolveQualifiedName(node.Name, EntityType.Type);
 			if (resolved == null)
 				return null;
-			if (EntityType.Ambiguous == resolved.EntityType)
+			if (resolved.IsAmbiguous())
 			{
 				// Remove from the buffer types that do not match requested generity
 				var resultingSet = new Set<IEntity>(((Ambiguous)resolved).Entities);
@@ -398,29 +432,21 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 			return resolved;
 		}
 
-		public IType ResolveGenericTypeReference(GenericTypeReference gtr, IEntity definition)
+		public IEntity ResolveGenericTypeReference(GenericTypeReference gtr, IEntity definition)
 		{
 			ResolveTypeReferenceCollection(gtr.GenericArguments);
-			IType[] typeArguments = GetTypes(gtr.GenericArguments);
+			IType[] typeArguments = gtr.GenericArguments.ToArray(t => TypeSystemServices.GetType(t));
 			
-			return (IType)My<GenericsServices>.Instance.ConstructEntity(
-			              	gtr, definition, typeArguments);
+			return My<GenericsServices>.Instance.ConstructEntity(gtr, definition, typeArguments);
 		}
 
 		public IEntity ResolveGenericReferenceExpression(GenericReferenceExpression gre, IEntity definition)
 		{
 			ResolveTypeReferenceCollection(gre.GenericArguments);
-			IType[] typeArguments = GetTypes(gre.GenericArguments);
+			IType[] typeArguments = gre.GenericArguments.ToArray(t => TypeSystemServices.GetType(t));
 			
 			return My<GenericsServices>.Instance.ConstructEntity(
 				gre, definition, typeArguments);
-		}
-
-		private IType[] GetTypes(TypeReferenceCollection typeReferences)
-		{
-			return Array.ConvertAll<TypeReference, IType>(
-				typeReferences.ToArray(),
-				TypeSystemServices.GetType);
 		}
 
 		private void FilterGenericTypes(Set<IEntity> types, SimpleTypeReference node)		
@@ -438,16 +464,16 @@ namespace Boo.Lang.Compiler.TypeSystem.Services
 			return type != null && type.GenericInfo != null;
 		}
 
-		private bool IsNotGenericType(IEntity entity)
+		private static bool IsNotGenericType(IEntity entity)
 		{
 			IType type = entity as IType;
 			return type != null && type.GenericInfo == null;
 		}
 
-		private IEntity NameNotType(SimpleTypeReference node, string whatItIs)
+		private IEntity NameNotType(SimpleTypeReference node, IEntity actual)
 		{
 			string suggestion = GetMostSimilarTypeName(node.Name);
-			CompilerErrors().Add(CompilerErrorFactory.NameNotType(node, node.ToCodeString(), whatItIs, suggestion));
+			CompilerErrors().Add(CompilerErrorFactory.NameNotType(node, node.Name, actual, suggestion));
 			return TypeSystemServices.ErrorEntity;
 		}
 

@@ -26,7 +26,6 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endregion
 
-using System;
 using System.Collections.Generic;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.TypeSystem.Core;
@@ -44,42 +43,9 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 
 		protected List _yieldStatements;
 
-		private bool? _isBooExtension;
-		private bool? _isClrExtension;
-
 		internal InternalMethod(InternalTypeSystemProvider provider, Method method) : base(method)
 		{
 			_provider = provider;
-		}
-
-		public bool IsExtension
-		{
-			get { return IsBooExtension || IsClrExtension; }
-		}
-
-		public bool IsBooExtension
-		{
-			get
-			{
-				if (null == _isBooExtension)
-				{
-					_isBooExtension = IsAttributeDefined(Types.BooExtensionAttribute);
-				}
-				return _isBooExtension.Value;
-			}
-		}
-
-		public bool IsClrExtension
-		{
-			get
-			{
-				if (null == _isClrExtension)
-				{
-					_isClrExtension = MetadataUtil.HasClrExtensions()
-					                  && IsAttributeDefined(Types.ClrExtensionAttribute);
-				}
-				return _isClrExtension.Value;
-			}
 		}
 
 		public bool IsDuckTyped
@@ -90,11 +56,6 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 		public bool IsPInvoke
 		{
 			get { return IsAttributeDefined(Types.DllImportAttribute); }
-		}
-		
-		private bool IsAttributeDefined(System.Type attributeType)
-		{
-			return IsDefined(My<TypeSystemServices>.Instance.Map(attributeType));
 		}
 
 		public bool IsAbstract
@@ -161,7 +122,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 				if (null == _node.ReturnType)
 					return _node.DeclaringType.NodeType == NodeType.ClassDefinition
 					       	? Unknown.Default
-					       	: (IType)_provider.VoidType;
+					       	: _provider.VoidType;
 				return TypeSystemServices.GetType(_node.ReturnType);
 			}
 		}
@@ -192,10 +153,9 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 			}
 		}
 		
-		
-		sealed class LabelCollector : DepthFirstVisitor
+		sealed class LabelCollector : FastDepthFirstVisitor
 		{
-			public static readonly InternalLabel[] EmptyInternalLabelArray = new InternalLabel[0];
+			private static readonly InternalLabel[] EmptyInternalLabelArray = new InternalLabel[0];
 
 			List _labels;
 
@@ -239,10 +199,12 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 
 		public Local ResolveLocal(string name)
 		{
-			foreach (Local local in _node.Locals)
+			var locals = _node.Locals;
+			for (int i = 0; i < locals.Count; i++)
 			{
+				var local = locals[i];
 				if (local.PrivateScope) continue;
-				if (name == local.Name) return local;
+				if (string.CompareOrdinal(name, local.Name) == 0) return local;
 			}
 			return null;
 		}
@@ -288,7 +250,7 @@ namespace Boo.Lang.Compiler.TypeSystem.Internal
 		
 		override public string ToString()
 		{
-			return TypeSystemServices.GetSignature(this);
+			return _node.FullName;
 		}
 		
 		public virtual IConstructedMethodInfo ConstructedInfo

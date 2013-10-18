@@ -2,9 +2,9 @@
 <project name="boo micro profile" default="test" description="Boo.Lang.dll with no System.Reflection.Emit references">
 <!--
 
-Micro profile currently means only no System.Reflection.Emit support.
+Micro profile currently means no System.Reflection.Emit dependencies for Boo.Lang.
 
-The following symbol is defined when compiling for the micro profile: 
+The following symbols are defined when compiling for the micro profile: 
 
 	NO_SYSTEM_REFLECTION_EMIT
 
@@ -31,6 +31,7 @@ The following symbol is defined when compiling for the micro profile:
 			
 			booLang = ModuleDefinition.ReadModule("build/Boo.Lang.dll")
 			assert not booLang.HasTypeReference("System.Reflection.Emit.ILGenerator")
+			assert "System.Core" not in [assemblyRef.Name for assemblyRef in booLang.AssemblyReferences]
 			</code>
 		</boo>
 	</target>
@@ -42,6 +43,7 @@ The following symbol is defined when compiling for the micro profile:
 	
 		<exec program="${xbuild}">
 			<arg file="${cecil.dir}/Mono.Cecil.csproj" />
+			<arg value="-property:OutputPath=bin/Debug" />
 		</exec>
 		
 	</target>

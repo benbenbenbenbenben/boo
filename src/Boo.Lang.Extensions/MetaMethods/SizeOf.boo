@@ -31,6 +31,7 @@ namespace Boo.Lang.Extensions
 import System
 import Boo.Lang.Compiler
 import Boo.Lang.Compiler.TypeSystem
+import Boo.Lang.Compiler.TypeSystem.Internal
 import Boo.Lang.Compiler.TypeSystem.Services
 import Boo.Lang.Environments
 

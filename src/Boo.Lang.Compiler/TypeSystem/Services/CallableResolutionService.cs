@@ -28,10 +28,11 @@
 
 using System;
 using System.Collections.Generic;
-
+using System.Linq;
 using Boo.Lang.Compiler.Ast;
 using Boo.Lang.Compiler.Steps;
 using Boo.Lang.Compiler.TypeSystem.Generics;
+using Boo.Lang.Compiler.TypeSystem.Internal;
 using Boo.Lang.Compiler.TypeSystem.Reflection;
 using Boo.Lang.Compiler.TypeSystem.Services;
 using Boo.Lang.Compiler.Util;
@@ -79,8 +80,8 @@ namespace Boo.Lang.Compiler.TypeSystem
 		{
 			public IMethod Method;
 			private CallableResolutionService _crs;
-			int[] _scores = null;
-			bool _expanded = false;
+			int[] _scores;
+			bool _expanded;
 
 			public Candidate(CallableResolutionService crs, IMethod entity)
 			{
@@ -133,17 +134,13 @@ namespace Boo.Lang.Compiler.TypeSystem
 			
 			override public bool Equals(object other)
 			{
-				if (null == other) return false;
-				if (this == other) return true;
-
-				Candidate candidate = other as Candidate;
-				return Equals(candidate);
+				return Equals(other as Candidate);
 			}
 
 			public bool Equals(Candidate other)
 			{
-				if (null == other) return false;
-				if (this == other) return true;
+				if (other == null) return false;
+				if (other == this) return true;
 
 				return Method == other.Method;
 			}
@@ -229,12 +226,12 @@ namespace Boo.Lang.Compiler.TypeSystem
 
 		private bool HasNonInternalCandidate()
 		{
-			return Collections.Any(ValidCandidates, IsNonInternalCandidate);
+			return ValidCandidates.Any(IsNonInternalCandidate);
 		}
 
 		private bool HasInternalCandidate()
 		{
-			return Collections.Any(ValidCandidates, IsInternalCandidate);
+			return ValidCandidates.Any(IsInternalCandidate);
 		}
 
 		private static bool IsInternalCandidate(Candidate c)
@@ -249,7 +246,7 @@ namespace Boo.Lang.Compiler.TypeSystem
 
 		private IEnumerable<Candidate> GetNonInternalCandidates()
 		{
-			return new List<Candidate>(Collections.Where(ValidCandidates, IsNonInternalCandidate));
+			return ValidCandidates.Where(IsNonInternalCandidate).ToList();
 		}
 
 		private List<Candidate> FindDataPreservingCandidates()
@@ -430,11 +427,11 @@ namespace Boo.Lang.Compiler.TypeSystem
 		private void InferGenericMethods()
 		{
 			var gs = My<GenericsServices>.Instance;
-			foreach (Candidate candidate in _candidates)
+			foreach (var candidate in _candidates)
 			{
 				if (candidate.Method.GenericInfo != null)
 				{
-					IType[] inferredTypeParameters = gs.InferMethodGenericArguments(candidate.Method, _arguments);
+					var inferredTypeParameters = gs.InferMethodGenericArguments(candidate.Method, _arguments);
 
 					if (inferredTypeParameters == null || 
 						!gs.CheckGenericConstruction(candidate.Method, inferredTypeParameters)) continue;
@@ -528,12 +525,8 @@ namespace Boo.Lang.Compiler.TypeSystem
 
 		private int CalculateArgumentScore(IType parameterType, IType argumentType)
 		{
-			if (parameterType == argumentType
-			    || (TypeSystemServices.IsSystemObject(argumentType) && 
-			        TypeSystemServices.IsSystemObject(parameterType)))
-				return parameterType is ICallableType
-				       	? CallableExactMatchScore
-				       	: ExactMatchScore;
+			if (parameterType == argumentType || (TypeSystemServices.IsSystemObject(argumentType) &&  TypeSystemServices.IsSystemObject(parameterType)))
+				return parameterType is ICallableType ? CallableExactMatchScore : ExactMatchScore;
 
 			if (TypeCompatibilityRules.IsAssignableFrom(parameterType, argumentType))
 			{				
@@ -548,9 +541,7 @@ namespace Boo.Lang.Compiler.TypeSystem
 				return ImplicitConversionScore;
 
 			if (TypeSystemServices.CanBeReachedByPromotion(parameterType, argumentType))
-				return IsWideningPromotion(parameterType, argumentType)
-				       	? WideningPromotion
-				       	: NarrowingPromotion;
+				return IsWideningPromotion(parameterType, argumentType) ? WideningPromotion : NarrowingPromotion;
 
 			if (MyDowncastPermissions().CanBeReachedByDowncast(parameterType, argumentType))
 				return DowncastScore;
